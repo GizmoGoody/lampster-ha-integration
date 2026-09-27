@@ -155,11 +155,13 @@ This project uses semantic versioning (MAJOR.MINOR.PATCH):
 - **MINOR**: New features, non-breaking changes
 - **PATCH**: Bug fixes, documentation updates
 
-### Current Version: 0.1.0
-- Initial implementation of Phase 1
-- Core library: client, models, exceptions
-- Test scripts: discovery, power, RGB, white, all modes
-- Documentation: README, CLAUDE.md
+### Current Version: 1.1.0
+- Phase 1 and Phase 2 complete
+- Fixes setup on current Home Assistant (issue #1)
+- Stays connected while on; touch button changes arrive as notifications
+- Options flow for connection behavior; effects; transitions; diagnostics
+  and repairs; automated tests (tests/automated) and GitHub Actions
+- See README.md for the full feature list and protocol notes
 
 ### Version History
 See git tags for version history:
@@ -397,6 +399,6 @@ MIT License (see LICENSE file)
 
 ---
 
-**Last Updated**: 2026-02-15
-**Project Phase**: Phase 1 - Local Testing
-**Current Version**: 0.1.0
+**Last Updated**: 2026-09-27
+**Project Phase**: Phase 2 complete - Home Assistant integration
+**Current Version**: 1.1.0

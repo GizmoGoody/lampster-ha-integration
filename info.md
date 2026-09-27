@@ -1,31 +1,31 @@
 {% if installed %}
 ## Changes in version {{version}}
 
-{% if version_installed.replace("v", "").replace(".","") | int < 100  %}
-### 🎉 Welcome to v1.0.0!
+{% if version_installed.replace("v", "").replace(".","") | int < 110  %}
+### What is new in v1.1.0
 
-This is the first stable release of The Lampster integration with Home Assistant best practices:
-
-- ✅ **Robust BLE Connection** - Uses bleak-retry-connector with 10s timeout
-- ✅ **Automatic State Polling** - Detects manual button presses every 30 seconds
-- ✅ **Coordinator Pattern** - Proper HA Bluetooth integration architecture
-- ✅ **Full Color Control** - RGB colors and color temperature (2700K-6500K)
-- ✅ **Brightness Control** - Smooth brightness adjustment
-- ✅ **Auto-Discovery** - Device appears automatically when powered on
+- ✅ **Setup fixed** - The Lampster sets up again on current Home Assistant versions (issue #1)
+- ✅ **Instant touch button sync** - Taps and holds on The Lampster show up in Home Assistant right away
+- ✅ **Responsive control** - One shared connection; dragging the color wheel is smooth
+- ✅ **Connection settings** - Keep the connection at all times, or set the check interval and hang-on time
+- ✅ **Effects and transitions** - Color Loop, Random, Candle, Fireplace and Breathe; fades on, off and between colors
+- ✅ **Brighter whites** - 100% now drives both LEDs fully at in-between color temperatures
+- ✅ **Favorite colors** - Pure colors and ten white temperatures added to the color picker
+- ✅ **Diagnostics** - Connection status, Bluetooth uplink, timing, temperature, diagnostics download and repair notices
 
 {% endif %}
 {% endif %}
 
 ## About
 
-Control your Lampster RGB Bluetooth lamp (Model: LA-2017B) directly from Home Assistant.
+Control The Lampster, an RGB Bluetooth lamp (Model: LA-2017B), directly from Home Assistant.
 
 ### Features
 
 - 🎨 **RGB Color Picker** - Choose any color
 - 🌡️ **Color Temperature** - Warm white (2700K) to cool white (6500K)
 - 💡 **Brightness** - Adjust light intensity 0-100%
-- 🔵 **Auto-Discovery** - Automatically finds your Lampster
+- 🔵 **Auto-Discovery** - Automatically finds The Lampster
 - ⏱️ **Manual Button Detection** - Syncs when you use the physical button
 - 📊 **Device Info** - Shows model and manufacturer in device page
 
@@ -37,17 +37,17 @@ Control your Lampster RGB Bluetooth lamp (Model: LA-2017B) directly from Home As
 
 ### Requirements
 
-- Home Assistant 2023.1 or newer
+- Home Assistant 2024.12 or newer
 - Bluetooth adapter with BLE support (built-in or USB dongle)
-- Lampster within Bluetooth range (~10m)
+- The Lampster within Bluetooth range (~10m)
 
 ### Setup
 
 After installation:
 
 1. Go to **Settings** → **Devices & Services**
-2. If auto-discovery worked, click **Configure** on the discovered Lampster
-3. If not, click **Add Integration** and search for "Lampster"
+2. If auto-discovery worked, click **Configure** on the discovered The Lampster entry
+3. If not, click **Add Integration** and search for "The Lampster"
 4. Select your device from the list
 5. The light entity will be added: `light.lampster`
 
@@ -63,9 +63,9 @@ Control the light like any other HA light:
 ### Known Limitations
 
 - Only one Bluetooth connection at a time (close official app if connected)
-- Physical button is disabled when controlled via Bluetooth
+- The Lampster app and Home Assistant cannot be connected at the same time; use one or the other
 - ~10m range depending on environment
-- Manual button press detection has 30-second polling delay
+- While The Lampster is off, turning it on by touch is noticed within the check interval (default 30 seconds) unless *Maintain Bluetooth connection at all times* is enabled
 
 ### Support
 

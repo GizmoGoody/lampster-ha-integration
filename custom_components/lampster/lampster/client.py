@@ -4,6 +4,8 @@ Protocol based on: https://github.com/Noki/the-lampster
 """
 
 import asyncio
+from collections.abc import Callable
+import dataclasses
 import logging
 from typing import Optional
 
@@ -11,11 +13,17 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 
 from .constants import (
+    CHAR_FIRMWARE_REVISION,
+    CHAR_HARDWARE_REVISION,
     CHAR_MODE,
     CHAR_RGB,
+    CHAR_TEMPERATURE,
     CHAR_WHITE,
     DEVICE_NAME_PREFIX,
-    MODE_OFF,
+    MODE_BIT_POWER,
+    MODE_BIT_RGB,
+    MODE_WRITE_ATTEMPTS,
+    MODE_WRITE_RETRY_DELAY,
     MODE_POWER_OFF,
     MODE_POWER_ON,
     MODE_RGB,
@@ -25,6 +33,28 @@ from .exceptions import CommandError, ConnectionError, DiscoveryError
 from .models import LampState, RGBColor, WhiteColor
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _parse_mode(value: int) -> tuple[bool, str]:
+    """Parse a MODE byte: bit 0x80 is power, bit 0x20 is RGB (otherwise white)."""
+    is_on = bool(value & MODE_BIT_POWER)
+    if not is_on:
+        return False, "off"
+    return True, "rgb" if value & MODE_BIT_RGB else "white"
+
+
+def _parse_rgb(data: bytes) -> Optional[RGBColor]:
+    """Parse RGB characteristic bytes (r, g, b; 0-100 each)."""
+    if len(data) < 3:
+        return None
+    return RGBColor(*(min(v, 100) for v in data[:3]))
+
+
+def _parse_white(data: bytes) -> Optional[WhiteColor]:
+    """Parse WHITE characteristic bytes (warm, cold; 0-100 each)."""
+    if len(data) < 2:
+        return None
+    return WhiteColor(*(min(v, 100) for v in data[:2]))
 
 
 class LampsterClient:
@@ -133,12 +163,44 @@ class LampsterClient:
         if not self._client or not self._client.is_connected:
             raise ConnectionError("Not connected to device")
 
-        try:
-            # Use write-with-response for mode switching (per Noki's char-write-req)
-            await self._client.write_gatt_char(CHAR_MODE, bytes([mode]), response=True)
-            _LOGGER.debug(f"Wrote mode: 0x{mode:02x}")
-        except Exception as e:
-            raise CommandError(f"Failed to write mode: {e}") from e
+        last_error: Exception | None = None
+        for attempt in range(1, MODE_WRITE_ATTEMPTS + 1):
+            try:
+                # Use write-with-response for mode switching (per Noki's char-write-req)
+                await self._client.write_gatt_char(CHAR_MODE, bytes([mode]), response=True)
+                _LOGGER.debug(f"Wrote mode: 0x{mode:02x}")
+                return
+            except Exception as e:
+                last_error = e
+
+            # The device also rejects writing the mode it is already in
+            try:
+                if await self._read_mode() == mode:
+                    _LOGGER.debug(f"Mode already 0x{mode:02x}")
+                    return
+            except Exception:
+                pass
+
+            _LOGGER.debug(
+                f"Mode write 0x{mode:02x} rejected (attempt {attempt}): {last_error}"
+            )
+            await asyncio.sleep(MODE_WRITE_RETRY_DELAY)
+
+        raise CommandError(f"Failed to write mode: {last_error}") from last_error
+
+    async def _read_mode(self) -> int:
+        """Read the current mode byte from the device."""
+        return (await self._client.read_gatt_char(CHAR_MODE))[0]
+
+    async def _ensure_on(self):
+        """Power on if still off.
+
+        Switching to RGB or white mode normally powers the lamp on by itself,
+        and the device rejects POWER_ON while already on, so check first.
+        """
+        if not await self._read_mode() & MODE_BIT_POWER:
+            await self._write_mode(MODE_POWER_ON)
+            await asyncio.sleep(0.4)
 
     async def power_on(self):
         """Turn the lamp on.
@@ -236,6 +298,14 @@ class LampsterClient:
             raise ConnectionError("Not connected to device")
 
         try:
+            # Already on in rgb mode: a single color write is enough. This
+            # keeps rapid changes (e.g. dragging a color picker) responsive.
+            if self._state.is_on and self._state.mode == "rgb":
+                await self._client.write_gatt_char(CHAR_RGB, color.to_bytes(), response=False)
+                self._state.rgb_color = color
+                _LOGGER.debug(f"Updated rgb color: {color}")
+                return
+
             # Write color data FIRST (device may need this before mode switch)
             await self._client.write_gatt_char(CHAR_RGB, color.to_bytes(), response=False)
             await asyncio.sleep(0.2)  # Let color data settle
@@ -244,10 +314,11 @@ class LampsterClient:
             await self.set_rgb_mode()
             await asyncio.sleep(0.4)  # Device needs time to process mode change
 
-            # If lamp is off, power it on
-            if not self._state.is_on:
-                await self._write_mode(MODE_POWER_ON)
-                await asyncio.sleep(0.4)
+            await self._ensure_on()
+
+            # Switching mode can restore the device's remembered color for
+            # that mode, overriding the write above; write it again
+            await self._client.write_gatt_char(CHAR_RGB, color.to_bytes(), response=False)
 
             _LOGGER.info(f"Set RGB color: {color}")
 
@@ -270,6 +341,14 @@ class LampsterClient:
             raise ConnectionError("Not connected to device")
 
         try:
+            # Already on in white mode: a single color write is enough. This
+            # keeps rapid changes (e.g. dragging a color picker) responsive.
+            if self._state.is_on and self._state.mode == "white":
+                await self._client.write_gatt_char(CHAR_WHITE, color.to_bytes(), response=False)
+                self._state.white_color = color
+                _LOGGER.debug(f"Updated white color: {color}")
+                return
+
             # Write color data FIRST (device may need this before mode switch)
             await self._client.write_gatt_char(CHAR_WHITE, color.to_bytes(), response=False)
             await asyncio.sleep(0.2)  # Let color data settle
@@ -278,10 +357,11 @@ class LampsterClient:
             await self.set_white_mode()
             await asyncio.sleep(0.4)  # Device needs time to process mode change
 
-            # If lamp is off, power it on
-            if not self._state.is_on:
-                await self._write_mode(MODE_POWER_ON)
-                await asyncio.sleep(0.4)
+            await self._ensure_on()
+
+            # Switching mode can restore the device's remembered color for
+            # that mode, overriding the write above; write it again
+            await self._client.write_gatt_char(CHAR_WHITE, color.to_bytes(), response=False)
 
             _LOGGER.info(f"Set white color: {color}")
 
@@ -312,34 +392,12 @@ class LampsterClient:
             rgb_bytes = await self._client.read_gatt_char(CHAR_RGB)
             white_bytes = await self._client.read_gatt_char(CHAR_WHITE)
 
-            # Parse mode
-            mode_val = mode_bytes[0]
-            is_on = mode_val in (MODE_POWER_ON, MODE_RGB, MODE_WHITE)
-
-            if mode_val == MODE_RGB or mode_val == MODE_POWER_ON:
-                mode = "rgb" if mode_val == MODE_RGB else "white"
-            elif mode_val == MODE_WHITE:
-                mode = "white"
-            elif mode_val == MODE_POWER_OFF or mode_val == MODE_OFF:
-                mode = "off"
-            else:
-                mode = "unknown"
-
-            # Parse RGB (3 bytes: r, g, b)
-            rgb_color = None
-            if len(rgb_bytes) >= 3:
-                rgb_color = RGBColor(rgb_bytes[0], rgb_bytes[1], rgb_bytes[2])
-
-            # Parse WHITE (2 bytes: warm, cold)
-            white_color = None
-            if len(white_bytes) >= 2:
-                white_color = WhiteColor(white_bytes[0], white_bytes[1])
-
+            is_on, mode = _parse_mode(mode_bytes[0])
             state = LampState(
                 is_on=is_on,
                 mode=mode,
-                rgb_color=rgb_color,
-                white_color=white_color
+                rgb_color=_parse_rgb(rgb_bytes),
+                white_color=_parse_white(white_bytes),
             )
 
             _LOGGER.debug(f"Read state from device: {state}")
@@ -360,6 +418,91 @@ class LampsterClient:
         """
         self._state = await self.read_state()
         _LOGGER.info("State refreshed from device")
+
+    async def read_versions(self) -> dict[str, str]:
+        """Read the firmware and hardware revisions the device reports.
+
+        Returns:
+            Dict with "firmware" and/or "hardware" keys; a value that cannot
+            be read is left out
+
+        Raises:
+            ConnectionError: If not connected
+        """
+        if not self._client or not self._client.is_connected:
+            raise ConnectionError("Not connected to device")
+
+        versions: dict[str, str] = {}
+        for key, char in (
+            ("firmware", CHAR_FIRMWARE_REVISION),
+            ("hardware", CHAR_HARDWARE_REVISION),
+        ):
+            try:
+                raw = await self._client.read_gatt_char(char)
+            except Exception as e:
+                _LOGGER.debug(f"Could not read {key} revision: {e}")
+                continue
+            if value := bytes(raw).decode("utf-8", errors="ignore").strip("\x00 "):
+                versions[key] = value
+        return versions
+
+    async def start_notifications(
+        self,
+        on_state: Callable[[LampState], None],
+        on_temperature: Optional[Callable[[float], None]] = None,
+    ):
+        """Subscribe to state changes pushed by the device.
+
+        The device notifies MODE, WHITE and RGB changes, including those made
+        with its touch button, so local state stays current without polling.
+
+        Args:
+            on_state: Called with the updated state after each change
+            on_temperature: Called with the internal temperature (°C), which
+                the device sends about every 5 seconds
+
+        Raises:
+            ConnectionError: If not connected
+            CommandError: If subscribing fails
+        """
+        if not self._client or not self._client.is_connected:
+            raise ConnectionError("Not connected to device")
+
+        def handle_mode(_char, data: bytearray) -> None:
+            if data:
+                is_on, mode = _parse_mode(data[0])
+                self._state = dataclasses.replace(self._state, is_on=is_on, mode=mode)
+                on_state(self._state)
+
+        def handle_rgb(_char, data: bytearray) -> None:
+            if color := _parse_rgb(data):
+                self._state = dataclasses.replace(self._state, rgb_color=color)
+                on_state(self._state)
+
+        def handle_white(_char, data: bytearray) -> None:
+            if color := _parse_white(data):
+                self._state = dataclasses.replace(self._state, white_color=color)
+                on_state(self._state)
+
+        try:
+            await self._client.start_notify(CHAR_MODE, handle_mode)
+            await self._client.start_notify(CHAR_RGB, handle_rgb)
+            await self._client.start_notify(CHAR_WHITE, handle_white)
+        except Exception as e:
+            raise CommandError(f"Failed to subscribe to state changes: {e}") from e
+
+        if on_temperature is None:
+            return
+
+        def handle_temperature(_char, data: bytearray) -> None:
+            if len(data) >= 2:
+                on_temperature(int.from_bytes(data[:2], "little", signed=True) / 100)
+
+        try:
+            await self._client.start_notify(CHAR_TEMPERATURE, handle_temperature)
+        except Exception as e:
+            # Not essential for control; keep going without it
+            _LOGGER.debug(f"Temperature notifications unavailable: {e}")
 
     @property
     def state(self) -> LampState:

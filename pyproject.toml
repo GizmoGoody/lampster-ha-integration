@@ -1,6 +1,6 @@
 [project]
 name = "lampster-ha-integration"
-version = "0.1.1"
+version = "1.1.0"
 description = "Home Assistant integration for The Lampster RGB Bluetooth lamp"
 requires-python = ">=3.11"
 dependencies = [
@@ -20,3 +20,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["lampster"]
+
+[tool.pytest.ini_options]
+# Automated tests only; the other scripts in tests/ drive real hardware
+testpaths = ["tests/automated"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

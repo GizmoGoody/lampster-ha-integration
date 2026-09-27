@@ -1,7 +1,6 @@
 {
   "name": "The Lampster",
   "render_readme": true,
-  "homeassistant": "2023.1.0",
-  "filename": "lampster-ha-integration",
+  "homeassistant": "2024.12.0",
   "country": ["US", "GB", "DE", "NL", "FR", "ES", "IT", "PL"]
 }

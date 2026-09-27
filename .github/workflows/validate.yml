@@ -1,0 +1,45 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  hassfest:
+    name: Home Assistant validation (hassfest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand images ship inside the integration (HA 2026.3+); topics and
+          # issues are repository settings, not code
+          ignore: brands topics issues
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install test dependencies
+        run: |
+          pip install pytest-homeassistant-custom-component
+          python .github/scripts/component_requirements.py > component-requirements.txt
+          cat component-requirements.txt
+          pip install -r component-requirements.txt
+      - name: Run tests
+        run: pytest --junitxml=junit.xml -q
+      - name: Report failures as annotations
+        if: failure()
+        run: python .github/scripts/annotate_failures.py junit.xml
