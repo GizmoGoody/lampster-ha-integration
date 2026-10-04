@@ -296,6 +296,24 @@ async def test_touch_hold_during_effect_stays_on(
     assert coordinator.data.mode == "white"
 
 
+async def test_touch_on_reads_actual_levels(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Turning on with the touch button reads the levels the lamp shows.
+
+    The lamp reports only the mode, so without the read the white levels
+    Home Assistant last knew would be shown.
+    """
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_white_color", WhiteColor(40, 10))
+    lamp.touch_tap()  # off
+    lamp.white = bytes([25, 5])  # changed without a report
+    lamp.touch_tap()  # on
+    await hass.async_block_till_done()
+    assert coordinator.data.is_on
+    assert coordinator.data.white_color == WhiteColor(25, 5)
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

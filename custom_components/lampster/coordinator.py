@@ -39,7 +39,7 @@ from .lampster.exceptions import (
     ConnectionError as LampsterConnectionError,
     LampsterException,
 )
-from .lampster.models import LampState
+from .lampster.models import LampState, WhiteColor
 from .registry import find_device
 
 _LOGGER = logging.getLogger(__name__)
@@ -150,6 +150,10 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The task has brought the lamp into its mode; from then on a report
         # of another mode means the touch button was used
         self._task_engaged = False
+        # White brightness steps reported by the lamp (touch-button holds),
+        # and the white levels it last reported or were last read
+        self._white_steps = 0
+        self._reported_white: WhiteColor | None = None
         self._versions_read = False
         self._consecutive_failures = 0
         self._last_error: str | None = None
@@ -472,6 +476,15 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     def _handle_state_notification(self, state: LampState) -> None:
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
+        if self._task_mode is not None and self._task_engaged:
+            # The effect's or transition's writes are not reported
+            previous_mode = (True, self._task_mode)
+        else:
+            previous_mode = (self.data.is_on, self.data.mode) if self.data else None
+        same_mode = previous_mode == (state.is_on, state.mode)
+        if same_mode and state.mode == "white" and state.white_color != self._reported_white:
+            self._white_steps += 1
+        self._reported_white = state.white_color
         if self._task_mode is not None:
             if state.is_on and state.mode == self._task_mode:
                 # The effect's or transition's own writes; not recorded per step
@@ -489,20 +502,49 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                 # In color mode the touch button switches to white rather
                 # than off; treat a tap as "turn off"
                 self.hass.async_create_background_task(
-                    self._async_touch_off(state.white_color), "lampster touch off"
+                    self._async_touch_off(self._white_steps), "lampster touch off"
                 )
             self.hass.async_create_task(self._async_stop_task())
+        if state.is_on and not same_mode:
+            # The lamp reports only the new mode, not the levels it now shows.
+            # Runs after the task stop above, which was scheduled first
+            self.hass.async_create_background_task(
+                self._async_read_levels(), "lampster read levels"
+            )
         self._async_set_state(state, batch=True)
 
-    async def _async_touch_off(self, white: Any) -> None:
+    async def _async_read_levels(self) -> None:
+        """Read the LED levels after the touch button switched mode or turned it on.
+
+        The Lampster reports only the new mode. The levels Home Assistant last
+        knew can be out of date: turning off from Home Assistant sets them to
+        zero first, and the lamp may restore others.
+        """
+        async with self._lock:
+            if not self.connected or self._task_mode is not None:
+                return
+            try:
+                await self._client.refresh_state()
+            except COMMAND_ERRORS as err:
+                _LOGGER.debug("Reading The Lampster's levels failed: %s", err)
+                return
+            self._reported_white = self._client.state.white_color
+            self._async_set_state(self._client.state, batch=True)
+
+    async def _async_touch_off(self, white_steps: int) -> None:
         """Turn off after a tap that stopped a color effect or fade.
 
-        A hold changes the white brightness within TOUCH_OFF_DELAY; then the
+        A hold sends white brightness steps within TOUCH_OFF_DELAY; then the
         user is dimming, so The Lampster stays on.
         """
         await asyncio.sleep(TOUCH_OFF_DELAY)
         state = self.data
-        if state and state.is_on and state.mode == "white" and state.white_color == white:
+        if (
+            state
+            and state.is_on
+            and state.mode == "white"
+            and self._white_steps == white_steps
+        ):
             self._record("Touch button tapped during a color effect or fade; turning off")
             try:
                 await self.async_command("power_off")
