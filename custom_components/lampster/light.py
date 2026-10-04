@@ -132,6 +132,9 @@ class LampsterLight(LampsterEntity, LightEntity):
         super().__init__(coordinator)
         # Keep IDs short and stable regardless of the device name
         self.entity_id = "light.lampster"
+        # Last white requested from Home Assistant: the device values sent,
+        # with the Kelvin and brightness they came from
+        self._requested_white: tuple[WhiteColor, int, int] | None = None
 
         # Initialize state from coordinator data
         self._update_from_coordinator()
@@ -170,7 +173,14 @@ class LampsterLight(LampsterEntity, LightEntity):
 
         elif state.mode == "white" and state.white_color:
             self._attr_color_mode = ColorMode.COLOR_TEMP
-            if converted := _device_to_kelvin(state.white_color):
+            requested = self._requested_white
+            if requested and requested[0] == state.white_color:
+                # Each LED has only 101 levels, so converting the device
+                # values back is off by up to about 130 K at low brightness;
+                # while The Lampster still shows what was requested, report
+                # the request exactly
+                _, self._attr_color_temp_kelvin, self._attr_brightness = requested
+            elif converted := _device_to_kelvin(state.white_color):
                 self._attr_color_temp_kelvin, self._attr_brightness = converted
             else:
                 self._attr_brightness = 0
@@ -247,7 +257,7 @@ class LampsterLight(LampsterEntity, LightEntity):
                 color = _rgb_to_device(kwargs[ATTR_RGB_COLOR], brightness)
             elif ATTR_COLOR_TEMP_KELVIN in kwargs:
                 mode = MODE_WHITE
-                color = _kelvin_to_device(kwargs[ATTR_COLOR_TEMP_KELVIN], brightness)
+                color = self._white_request(kwargs[ATTR_COLOR_TEMP_KELVIN], brightness)
             elif ATTR_BRIGHTNESS in kwargs or (transition and not self._attr_is_on):
                 # Current color at the new brightness (or fading on from off)
                 if self._attr_color_mode == ColorMode.RGB:
@@ -255,7 +265,7 @@ class LampsterLight(LampsterEntity, LightEntity):
                     color = _rgb_to_device(self._attr_rgb_color, brightness)
                 else:
                     mode = MODE_WHITE
-                    color = _kelvin_to_device(self._attr_color_temp_kelvin, brightness)
+                    color = self._white_request(self._attr_color_temp_kelvin, brightness)
             elif not self._attr_is_on:
                 await self.coordinator.async_command("power_on")
                 return
@@ -271,6 +281,13 @@ class LampsterLight(LampsterEntity, LightEntity):
 
         except COMMAND_ERRORS as err:
             raise HomeAssistantError(f"Failed to turn on The Lampster: {err}") from err
+
+    def _white_request(self, kelvin: int, brightness: int) -> WhiteColor:
+        """Convert a white request to device values and remember it."""
+        kelvin = max(MIN_KELVIN, min(MAX_KELVIN, kelvin))
+        color = _kelvin_to_device(kelvin, brightness)
+        self._requested_white = (color, kelvin, brightness)
+        return color
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light, optionally fading over a transition."""

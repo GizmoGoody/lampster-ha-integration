@@ -24,6 +24,7 @@ from custom_components.lampster.coordinator import (
     LampsterCoordinator,
 )
 from custom_components.lampster.lampster.models import RGBColor, WhiteColor
+from custom_components.lampster.light import LampsterLight
 
 from .conftest import ADDRESS, FakeBleakClient, FakeLamp
 
@@ -294,6 +295,25 @@ async def test_touch_hold_during_effect_stays_on(
     assert lamp.mode & 0x80
     assert coordinator.effect is None
     assert coordinator.data.mode == "white"
+
+
+async def test_white_request_reported_exactly(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A requested color temperature is shown as requested, not as converted back.
+
+    At 10% brightness, 3200 K becomes warm 10 / cold 2, which converts back
+    to 3333 K. Once the touch button changes the LEDs, the device values apply.
+    """
+    coordinator = make_coordinator(always_connected=True)
+    light = LampsterLight(coordinator)
+    await light.async_turn_on(color_temp_kelvin=3200, brightness=26)
+    light._update_from_coordinator()
+    assert (light.color_temp_kelvin, light.brightness) == (3200, 26)
+
+    lamp.touch_hold(steps=1)
+    light._update_from_coordinator()
+    assert light.color_temp_kelvin != 3200
 
 
 async def test_repair_issue_raised_and_cleared(
