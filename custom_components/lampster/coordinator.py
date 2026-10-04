@@ -65,8 +65,12 @@ FAILURES_BEFORE_ISSUE = 5
 ISSUE_CANNOT_CONNECT = "cannot_connect"
 ISSUE_NO_CONNECTION_SLOT = "no_connection_slot"
 
-# Connection events kept for the diagnostics download
-EVENT_HISTORY = 50
+# Connection, command and touch-button events kept for the diagnostics download
+EVENT_HISTORY = 100
+
+# A touch-button hold sends about 10 brightness steps per second; it is kept
+# as one event once no step has arrived for this long
+TOUCH_SUMMARY_DELAY = 1.0
 
 COMMAND_ERRORS = (LampsterException, BleakError, TimeoutError)
 
@@ -154,6 +158,13 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._consecutive_failures = 0
         self._last_error: str | None = None
         self._events: deque[tuple[str, str]] = deque(maxlen=EVENT_HISTORY)
+        # Last state The Lampster reported or a command left it in, so touch
+        # button events can say what changed
+        self._reported: LampState | None = None
+        # Color before and after the touch-button hold being summarized
+        self._touch_from: Color | None = None
+        self._touch_to: Color | None = None
+        self._cancel_touch_summary: CALLBACK_TYPE | None = None
 
         # None until the first successful connection
         self.data: LampState | None = None
@@ -235,6 +246,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._async_delete_issues()
         self._async_cancel_reconnect()
         self._async_cancel_batched_update()
+        self._async_flush_touch_summary()
         async with self._lock:
             await self._async_disconnect("integration unloading")
 
@@ -322,6 +334,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                 return
             method_name, args = self._pending_command
             self._pending_command = None
+            self._record(" ".join(["Command", method_name, *map(str, args)]))
 
             try:
                 client = await self._async_execute(method_name, args)
@@ -472,6 +485,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     def _handle_state_notification(self, state: LampState) -> None:
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
+        self._async_record_touch(state)
         if self._task_mode is not None:
             if state.is_on and state.mode == self._task_mode:
                 # The effect's or transition's own writes; not recorded per step
@@ -493,6 +507,42 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                 )
             self.hass.async_create_task(self._async_stop_task())
         self._async_set_state(state, batch=True)
+
+    @callback
+    def _async_record_touch(self, state: LampState) -> None:
+        """Keep a diagnostics event for a change made with the touch button.
+
+        The Lampster does not report our own writes, so every report is the
+        touch button. Power and mode changes are kept as they happen; the
+        brightness steps of a hold are kept as one event when it ends.
+        """
+        previous, self._reported = self._reported, state
+        if previous is None or (state.is_on, state.mode) != (previous.is_on, previous.mode):
+            self._async_flush_touch_summary()
+            self._record(f"Touch button: {state}")
+            return
+        color = state.rgb_color if state.mode == MODE_RGB else state.white_color
+        before = previous.rgb_color if state.mode == MODE_RGB else previous.white_color
+        if color == before:
+            return
+        if self._touch_from is None:
+            self._touch_from = before
+        self._touch_to = color
+        if self._cancel_touch_summary is not None:
+            self._cancel_touch_summary()
+        self._cancel_touch_summary = async_call_later(
+            self.hass, TOUCH_SUMMARY_DELAY, self._async_flush_touch_summary
+        )
+
+    @callback
+    def _async_flush_touch_summary(self, _now: datetime | None = None) -> None:
+        """Record the touch-button hold being summarized, if any."""
+        if self._cancel_touch_summary is not None:
+            self._cancel_touch_summary()
+            self._cancel_touch_summary = None
+        if self._touch_to is not None:
+            self._record(f"Touch button hold: {self._touch_from} to {self._touch_to}")
+        self._touch_from = self._touch_to = None
 
     async def _async_touch_off(self, white: Any) -> None:
         """Turn off after a tap that stopped a color effect or fade.
@@ -524,6 +574,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Store new state, apply the connection policy and notify entities."""
         was_on = bool(self.data and self.data.is_on)
         self.data = dataclasses.replace(state)
+        self._reported = self.data
 
         if self.connected and apply_policy:
             if self._should_stay_connected():

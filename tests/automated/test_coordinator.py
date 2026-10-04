@@ -296,6 +296,32 @@ async def test_touch_hold_during_effect_stays_on(
     assert coordinator.data.mode == "white"
 
 
+def event_log(coordinator: LampsterCoordinator) -> list[str]:
+    """Return the diagnostics events, oldest first."""
+    return [event["event"] for event in coordinator.diagnostics()["recent_events"]]
+
+
+async def test_diagnostics_record_commands_and_touch(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Commands, taps and holds appear in the diagnostics events."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_white_color", WhiteColor(40, 10))
+    assert "Command set_white_color White(warm=40, cold=10)" in event_log(coordinator)
+
+    lamp.touch_hold(steps=5)
+    lamp.touch_hold(steps=5)
+    # One event for the whole hold, once it has ended
+    assert not any(event.startswith("Touch button hold") for event in event_log(coordinator))
+    fire(hass, 2)
+    await hass.async_block_till_done()
+    holds = [event for event in event_log(coordinator) if event.startswith("Touch button hold")]
+    assert holds == ["Touch button hold: White(warm=40, cold=10) to White(warm=30, cold=0)"]
+
+    lamp.touch_tap()
+    assert event_log(coordinator)[-1] == "Touch button: State(off)"
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

@@ -303,7 +303,7 @@ Connection dropped unexpectedly; reconnecting in 5 s
 
 ### Download diagnostics
 
-**Settings** → **Devices & Services** → **The Lampster** → **⋮** → **Download diagnostics** saves one file with the connection settings, connection status, firmware versions, recent connection events and the last error. The Bluetooth address of The Lampster is removed from the file.
+**Settings** → **Devices & Services** → **The Lampster** → **⋮** → **Download diagnostics** saves one file with the connection settings, connection status, firmware versions, recent events and the last error. The events cover connections, commands sent from Home Assistant and changes made with the touch button (a hold is kept as one event from its first to its last brightness). With debug logging enabled, the log also shows the raw bytes of every change The Lampster reports. The Bluetooth address of The Lampster is removed from the file.
 
 ### Repair notices
 
