@@ -25,6 +25,7 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .effects import (
     MODE_RGB,
+    MODE_WHITE,
     Color,
     Step,
     current_color,
@@ -150,6 +151,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The task has brought the lamp into its mode; from then on a report
         # of another mode means the touch button was used
         self._task_engaged = False
+        # The color the task last wrote; the lamp does not report our color
+        # writes, so a different white reported in the task's mode is a hold
+        self._task_color: Color | None = None
         self._versions_read = False
         self._consecutive_failures = 0
         self._last_error: str | None = None
@@ -472,25 +476,36 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     def _handle_state_notification(self, state: LampState) -> None:
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
-        if self._task_mode is not None:
-            if state.is_on and state.mode == self._task_mode:
+        if (task_mode := self._task_mode) is not None:
+            in_task_mode = state.is_on and state.mode == task_mode
+            hold = (
+                in_task_mode
+                and task_mode == MODE_WHITE
+                and self._task_engaged
+                and state.white_color != self._task_color
+            )
+            if in_task_mode and not hold:
                 # The effect's or transition's own writes; not recorded per step
                 self._task_engaged = True
                 return
             if not self._task_engaged:
                 # Still switching the lamp into the task's mode
                 return
-            # The touch button switched mode or turned it off: stop the task
-            self._record(
-                f"The Lampster left {self._task_mode} mode; stopping "
-                + (f"effect {self.effect}" if self.effect else "transition")
-            )
-            if self._task_mode == MODE_RGB and state.is_on and state.mode == "white":
+            task_name = f"effect {self.effect}" if self.effect else "transition"
+            if hold:
+                # A touch-button hold in white: let the lamp dim
+                self._record(f"Touch button held; stopping {task_name}")
+            else:
+                # The touch button switched mode or turned it off
+                self._record(f"The Lampster left {task_mode} mode; stopping {task_name}")
+            if task_mode == MODE_RGB and state.is_on and state.mode == "white":
                 # In color mode the touch button switches to white rather
                 # than off; treat a tap as "turn off"
                 self.hass.async_create_background_task(
                     self._async_touch_off(state.white_color), "lampster touch off"
                 )
+            # Stop writing steps right away; the stop below waits for the task
+            self._task_mode = None
             self.hass.async_create_task(self._async_stop_task())
         self._async_set_state(state, batch=True)
 
@@ -617,6 +632,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     ) -> None:
         self._task_mode = mode
         self._task_engaged = False
+        self._task_color = None
         self._task = self.hass.async_create_background_task(
             self._async_run_steps(mode, steps, name, finish), f"lampster {name}"
         )
@@ -651,13 +667,15 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             for step in steps:
                 async with self._lock:
                     client = await self._async_ensure_connected(name)
-                    if self._task_engaged and not (
-                        client.state.is_on and client.state.mode == mode
+                    if self._task_mode != mode or (
+                        self._task_engaged
+                        and not (client.state.is_on and client.state.mode == mode)
                     ):
-                        # The touch button turned The Lampster off or changed
-                        # mode; writing now would switch it back on
+                        # Stopped by the touch button (off, another mode or a
+                        # hold); writing now would undo it
                         return
                     await getattr(client, write)(step.color)
+                    self._task_color = step.color
                     # The Lampster is now in the task's mode. It only reports
                     # mode changes, not our color writes, so this cannot be
                     # left to its reports (none come when it was already in

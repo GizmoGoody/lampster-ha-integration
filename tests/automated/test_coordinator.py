@@ -296,6 +296,29 @@ async def test_touch_hold_during_effect_stays_on(
     assert coordinator.data.mode == "white"
 
 
+async def test_touch_hold_stops_white_effect(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A hold during a white effect stops it, so the lamp's dimming is kept."""
+    coordinator = make_coordinator()
+    await coordinator.async_command("set_white_color", WhiteColor(40, 0))
+    await coordinator.async_start_effect("candle", 200)
+    for _ in range(40):
+        if coordinator._task_engaged:
+            break
+        await asyncio.sleep(0.05)
+    assert coordinator._task_engaged
+
+    lamp.touch_hold(steps=3)
+    await asyncio.sleep(1)
+    await hass.async_block_till_done()
+    assert coordinator.effect is None
+    assert lamp.mode & 0x80
+    held = lamp.white
+    await asyncio.sleep(1)
+    assert lamp.white == held  # no more candle steps
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

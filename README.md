@@ -107,7 +107,7 @@ Effects are chosen from the light card or with `light.turn_on`:
 | Fireplace | Red and orange embers that flare and fade |
 | Breathe | The current color slowly brightens and dims |
 
-The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or pressing the touch button stops an effect. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
+The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or tapping or holding the touch button stops an effect or fade, whether it runs in white or in color. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
 
 Transitions fade over the given number of seconds:
 
