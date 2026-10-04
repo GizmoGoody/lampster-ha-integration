@@ -333,7 +333,7 @@ Then restart Home Assistant.
 2. **Touch Button While Off**: With the default settings, turning The Lampster on with the touch button is noticed at the next check (within the check interval). Enable *Maintain Bluetooth connection at all times* to make it instant
 3. **State Persistence**: Device remembers last color even when powered off
 4. **Range**: Bluetooth LE has limited range (~10m line of sight, less through walls)
-5. **Power Off**: Home Assistant turns The Lampster off the way the touch button does, keeping the mode and levels, so a tap turns it back on as it was. If The Lampster does not accept that, Home Assistant switches to white, sets the levels to zero and then turns it off; a tap then turns it on at the lowest level
+5. **Power Off**: Home Assistant turns The Lampster off the way the touch button does, keeping the mode and levels, so a tap turns it back on as it was. If The Lampster does not accept that, Home Assistant switches to white, sets the levels to zero and then turns it off; a tap then turns it on at the lowest level. Turning on from Home Assistant without choosing a color, color temperature or brightness works like a tap too: The Lampster comes back as it was when it was turned off, or in warm white at 50% if its levels are zero
 
 ## Development
 

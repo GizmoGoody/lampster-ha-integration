@@ -134,6 +134,33 @@ async def test_power_off_falls_back_to_zeroed(
     assert not client.state.is_on
 
 
+async def test_power_on_restores_mode_and_levels(lamp: FakeLamp) -> None:
+    """Power on sets only the power bit, like a tap, and reads what came back."""
+    for off, on in ((0x28, 0xA8), (0x48, 0xC8)):
+        lamp.mode = off
+        lamp.rgb = bytes([40, 0, 0])
+        lamp.white = bytes([30, 5])
+        client = _client(lamp)
+        await client.power_on()
+        assert lamp.mode == on
+        assert client.state.is_on
+        if on == 0xA8:
+            assert client.state.rgb_color == RGBColor(40, 0, 0)
+        else:
+            assert client.state.white_color == WhiteColor(30, 5)
+
+
+async def test_power_on_dark_levels_uses_default(lamp: FakeLamp) -> None:
+    """If the stored levels are zero, power on uses warm white at 50%."""
+    lamp.mode = 0x40
+    lamp.white = bytes([0, 0])
+    client = _client(lamp)
+    await client.power_on()
+    assert lamp.mode & 0x80
+    assert lamp.white == bytes([50, 0])
+    assert client.state.white_color == WhiteColor(50, 0)
+
+
 async def test_notifications_update_state(lamp: FakeLamp) -> None:
     """Pushed MODE/WHITE changes update the state and call back."""
     lamp.mode = 0xC8
