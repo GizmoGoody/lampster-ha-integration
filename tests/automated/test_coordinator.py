@@ -296,6 +296,34 @@ async def test_touch_hold_during_effect_stays_on(
     assert coordinator.data.mode == "white"
 
 
+async def test_connection_source_from_slot_allocations(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """The uplink is the adapter or proxy that reports holding the connection."""
+
+    def scanner(source: str, allocated: list[str]) -> SimpleNamespace:
+        allocations = SimpleNamespace(allocated=allocated)
+        return SimpleNamespace(source=source, get_allocations=lambda: allocations)
+
+    scanners = [
+        scanner("11:11:11:11:11:11", ["AA:AA:AA:AA:AA:AA"]),
+        scanner("22:22:22:22:22:22", [ADDRESS.lower()]),
+    ]
+    coordinator = make_coordinator(always_connected=True)
+    with patch.object(
+        coordinator_module.bluetooth,
+        "async_current_scanners",
+        return_value=scanners,
+        create=True,
+    ):
+        assert coordinator.connection_source is None  # not connected yet
+        await coordinator._async_try_connect("check interval")
+        assert coordinator.connection_source == "22:22:22:22:22:22"
+
+        scanners.pop()  # no adapter or proxy reports the connection
+        assert coordinator.connection_source is None
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

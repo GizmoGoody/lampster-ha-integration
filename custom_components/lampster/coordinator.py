@@ -60,6 +60,10 @@ STATE_UPDATE_BATCH_DELAY = 0.5
 # this time, it was a tap and The Lampster is turned off
 TOUCH_OFF_DELAY = 0.8
 
+# Adapters and proxies report their connections shortly after connecting;
+# refresh the entities once more after this delay so the uplink shows it
+CONNECTION_SOURCE_REFRESH_DELAY = 5
+
 # Raise a repair issue after this many connection failures in a row
 FAILURES_BEFORE_ISSUE = 5
 ISSUE_CANNOT_CONNECT = "cannot_connect"
@@ -143,6 +147,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._cancel_off_disconnect: CALLBACK_TYPE | None = None
         self._cancel_reconnect: CALLBACK_TYPE | None = None
         self._cancel_batched_update: CALLBACK_TYPE | None = None
+        self._cancel_source_refresh: CALLBACK_TYPE | None = None
         # Effect or transition running in the background, and the mode it
         # keeps the lamp in (None while it finishes)
         self._task: asyncio.Task | None = None
@@ -209,6 +214,29 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             self.hass, self._address, connectable=True
         )
 
+    @property
+    def connection_source(self) -> str | None:
+        """Return the source of the adapter or proxy holding the connection.
+
+        Home Assistant picks the adapter or proxy when connecting, and each
+        one reports the devices it is connected to (the connection slots on
+        Settings > Bluetooth). None while disconnected, or when none of them
+        reports the connection.
+        """
+        if not self.connected:
+            return None
+        # Not available in every supported Home Assistant version
+        current_scanners = getattr(bluetooth, "async_current_scanners", None)
+        if current_scanners is None:
+            return None
+        address = self._address.upper()
+        for scanner in current_scanners(self.hass):
+            get_allocations = getattr(scanner, "get_allocations", None)
+            allocations = get_allocations() if get_allocations else None
+            if allocations and address in (a.upper() for a in allocations.allocated):
+                return scanner.source
+        return None
+
     def _should_stay_connected(self) -> bool:
         """Whether the connection should be kept open right now."""
         return self._always_connected or bool(self.data and self.data.is_on)
@@ -235,6 +263,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._async_delete_issues()
         self._async_cancel_reconnect()
         self._async_cancel_batched_update()
+        self._async_cancel_source_refresh()
         async with self._lock:
             await self._async_disconnect("integration unloading")
 
@@ -407,6 +436,10 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             f"The Lampster state: {client.state}"
         )
         self._async_connection_succeeded()
+        self._async_cancel_source_refresh()
+        self._cancel_source_refresh = async_call_later(
+            self.hass, CONNECTION_SOURCE_REFRESH_DELAY, self._async_refresh_source
+        )
         if self._task_mode is None:
             # The caller decides whether to stay connected (a command may be
             # about to turn the lamp on), so don't start the off countdown here
@@ -740,6 +773,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             "last_command_ms": self.last_command_ms,
             "consecutive_failures": self._consecutive_failures,
             "last_error": self._last_error,
+            "connection_source": self.connection_source,
             "last_advertisement": {
                 "rssi": service_info.rssi,
                 "source": service_info.source,
@@ -769,6 +803,17 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         if self._cancel_batched_update is not None:
             self._cancel_batched_update()
             self._cancel_batched_update = None
+
+    @callback
+    def _async_refresh_source(self, _now: datetime) -> None:
+        self._cancel_source_refresh = None
+        self.async_update_listeners()
+
+    @callback
+    def _async_cancel_source_refresh(self) -> None:
+        if self._cancel_source_refresh is not None:
+            self._cancel_source_refresh()
+            self._cancel_source_refresh = None
 
     @callback
     def _async_cancel_off_disconnect(self) -> None:
