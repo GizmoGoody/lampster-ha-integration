@@ -39,11 +39,16 @@ class FakeLamp:
             self.client.subscriptions[key](None, bytearray(data))
 
     def touch_tap(self) -> None:
-        """Simulate a touch-button tap: white on <-> off; color on -> white on."""
+        """Simulate a touch-button tap.
+
+        Color on -> white on (the real lamp sometimes turns off instead);
+        white on -> off; off -> on in the mode it was turned off in
+        (0x28 -> 0xA8, 0x48 -> 0xC8, 0x40 -> 0xC0, as logged on hardware).
+        """
         if self.mode & 0x80 and self.mode & 0x20:
             self.mode = 0xC8
         else:
-            self.mode = 0xC8 if not self.mode & 0x80 else 0x48
+            self.mode ^= 0x80
         self.push(MODE, bytes([self.mode]))
 
     def touch_hold(self, steps: int = 5) -> None:
