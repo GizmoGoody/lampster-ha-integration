@@ -24,7 +24,8 @@ class FakeLamp:
 
     - MODE bit 0x80 is power, 0x20 is RGB; switching mode powers it on
     - POWER_ON (0xC0) is rejected while already on
-    - Every change is pushed to subscribers, like the real notifications
+    - Touch-button changes are pushed to subscribers; writes made over
+      Bluetooth are not, as on the real lamp
     """
 
     def __init__(self) -> None:
@@ -33,8 +34,9 @@ class FakeLamp:
         self.rgb = bytes([0, 0, 30])
         self.client: FakeBleakClient | None = None
         self.white_writes: list[tuple[int, ...]] = []
-        # The real lamp does not report mode writes made over Bluetooth
-        self.report_mode_writes = True
+        # Like the real lamp, writes made over Bluetooth are not reported;
+        # set True to also report mode writes
+        self.report_mode_writes = False
 
     def push(self, key: str, data: bytes) -> None:
         if self.client and self.client.is_connected and key in self.client.subscriptions:

@@ -330,7 +330,6 @@ async def test_diagnostics_hold_during_effect_is_a_hold(
     The lamp does not report the effect's writes, so a hold during an effect
     started from off must be recorded as a hold, not as turning on.
     """
-    lamp.report_mode_writes = False  # like the real lamp
     coordinator = make_coordinator(always_connected=True)
     await coordinator._async_try_connect("check interval")  # lamp is off
     await coordinator.async_start_effect("candle", 200)
