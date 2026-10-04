@@ -59,7 +59,10 @@
               "random": "Random",
               "candle": "Candle",
               "fireplace": "Fireplace",
-              "breathe": "Breathe"
+              "breathe": "Breathe",
+              "spin_cw": "Spin CW",
+              "spin_ccw": "Spin CCW",
+              "spin_alternating": "Spin Alternating"
             }
           }
         }
