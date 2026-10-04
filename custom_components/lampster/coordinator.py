@@ -714,6 +714,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     # left to its reports (none come when it was already in
                     # this mode); from here a mode report means the touch button
                     self._task_engaged = True
+                    # Not reported either, so touch-button events compare
+                    # against what the effect or transition last wrote
+                    self._reported = dataclasses.replace(client.state)
                     self._async_cancel_off_disconnect()
                 await asyncio.sleep(step.delay)
             # Done: the lamp's own reports apply normally again

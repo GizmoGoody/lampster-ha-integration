@@ -322,6 +322,28 @@ async def test_diagnostics_record_commands_and_touch(
     assert event_log(coordinator)[-1] == "Touch button: State(off)"
 
 
+async def test_diagnostics_hold_during_effect_is_a_hold(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """An effect turning the lamp on is not taken for the touch button.
+
+    The lamp does not report the effect's writes, so a hold during an effect
+    started from off must be recorded as a hold, not as turning on.
+    """
+    lamp.report_mode_writes = False  # like the real lamp
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator._async_try_connect("check interval")  # lamp is off
+    await coordinator.async_start_effect("candle", 200)
+    for _ in range(40):
+        if coordinator._task_engaged:
+            break
+        await asyncio.sleep(0.05)
+    lamp.touch_hold(steps=2)
+    assert not any(
+        event.startswith("Touch button: State(on") for event in event_log(coordinator)
+    )
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

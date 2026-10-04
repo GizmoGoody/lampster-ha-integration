@@ -33,6 +33,8 @@ class FakeLamp:
         self.rgb = bytes([0, 0, 30])
         self.client: FakeBleakClient | None = None
         self.white_writes: list[tuple[int, ...]] = []
+        # The real lamp does not report mode writes made over Bluetooth
+        self.report_mode_writes = True
 
     def push(self, key: str, data: bytes) -> None:
         if self.client and self.client.is_connected and key in self.client.subscriptions:
@@ -77,8 +79,9 @@ class FakeBleakClient:
 
                 raise BleakError("Write Not Permitted")
             self.lamp.mode = value
-            # Mode changes are reported; color writes are not echoed back
-            self.lamp.push(key, bytes(data))
+            # Color writes are not echoed back
+            if self.lamp.report_mode_writes:
+                self.lamp.push(key, bytes(data))
         elif key == WHITE:
             self.lamp.white = bytes(data)
             self.lamp.white_writes.append(tuple(data))
