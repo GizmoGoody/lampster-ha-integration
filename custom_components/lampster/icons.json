@@ -17,7 +17,8 @@
               "candle": "mdi:candle",
               "fireplace": "mdi:fireplace",
               "breathe": "mdi:sine-wave",
-              "fireworks": "mdi:firework"
+              "fireworks": "mdi:firework",
+              "pursuit": "mdi:car-emergency"
             }
           }
         }
