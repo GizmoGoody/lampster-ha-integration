@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from .lampster.models import RGBColor, WhiteColor
 
 from homeassistant.components.light import (
@@ -21,11 +23,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import (
+    AddEntitiesCallback,
+    async_get_current_platform,
+)
 
-from .const import DOMAIN
+from .const import DOMAIN, SERVICE_START_EFFECT
 from .coordinator import COMMAND_ERRORS, LampsterCoordinator
-from .effects import EFFECTS, MODE_RGB, MODE_WHITE
+from .effects import EFFECT_SPEED_MAX, EFFECT_SPEED_MIN, EFFECTS, MODE_RGB, MODE_WHITE
 from .entity import LampsterEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,6 +112,20 @@ async def async_setup_entry(
     coordinator: LampsterCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     async_add_entities([LampsterLight(coordinator)])
+
+    async_get_current_platform().async_register_entity_service(
+        SERVICE_START_EFFECT,
+        {
+            vol.Required("effect"): vol.In(EFFECTS),
+            vol.Optional("speed"): vol.All(
+                vol.Coerce(int), vol.Range(min=EFFECT_SPEED_MIN, max=EFFECT_SPEED_MAX)
+            ),
+            vol.Optional("brightness_pct"): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=100)
+            ),
+        },
+        "async_start_effect_action",
+    )
 
 
 class LampsterLight(LampsterEntity, LightEntity):
@@ -236,7 +255,13 @@ class LampsterLight(LampsterEntity, LightEntity):
 
         try:
             if effect in EFFECTS:
-                await self.coordinator.async_start_effect(effect, brightness)
+                # Restarting the running effect keeps the speed it was started with
+                speed = (
+                    self.coordinator.effect_speed_override
+                    if effect == self.coordinator.effect
+                    else None
+                )
+                await self.coordinator.async_start_effect(effect, brightness, speed)
                 return
 
             if effect == EFFECT_OFF:
@@ -271,6 +296,20 @@ class LampsterLight(LampsterEntity, LightEntity):
 
         except COMMAND_ERRORS as err:
             raise HomeAssistantError(f"Failed to turn on The Lampster: {err}") from err
+
+    async def async_start_effect_action(
+        self, effect: str, speed: int | None = None, brightness_pct: int | None = None
+    ) -> None:
+        """Start an effect, optionally at its own speed and brightness (action)."""
+        brightness = (
+            round(brightness_pct * 255 / 100)
+            if brightness_pct is not None
+            else self._attr_brightness or 255
+        )
+        try:
+            await self.coordinator.async_start_effect(effect, brightness, speed)
+        except COMMAND_ERRORS as err:
+            raise HomeAssistantError(f"Failed to start the effect: {err}") from err
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light, optionally fading over a transition."""

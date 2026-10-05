@@ -24,12 +24,14 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .effects import (
+    EFFECT_SPEED_DEFAULT,
     MODE_RGB,
     Color,
     Step,
     current_color,
     effect_mode,
     effect_steps,
+    scale_steps,
     transition_steps,
     zero_color,
 )
@@ -159,6 +161,12 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data: LampState | None = None
         self.temperature: float | None = None
         self.effect: str | None = None
+        # Speed for effects in percent (the Effect speed setting)
+        self.effect_speed: int = EFFECT_SPEED_DEFAULT
+        # The running effect's own speed when an action started it with one;
+        # None when it follows effect_speed
+        self.effect_speed_override: int | None = None
+        self._effect_brightness = 255
 
         # Diagnostics
         self.last_connect_ms: int | None = None
@@ -557,15 +565,30 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     f"The Lampster off for {self._off_disconnect_delay} s"
                 )
 
-    async def async_start_effect(self, effect: str, brightness: int) -> None:
-        """Start a software effect at the given brightness (0-255)."""
+    async def async_start_effect(
+        self, effect: str, brightness: int, speed: int | None = None
+    ) -> None:
+        """Start a software effect at a brightness (0-255).
+
+        Runs at the given speed (percent), or else at effect_speed.
+        """
         await self._async_stop_task()
         mode = effect_mode(effect, self.data)
-        steps = effect_steps(effect, brightness, self.data)
+        steps = scale_steps(
+            effect_steps(effect, brightness, self.data), speed or self.effect_speed
+        )
         self.effect = effect
+        self.effect_speed_override = speed
+        self._effect_brightness = brightness
         self._async_start_task(mode, steps, f"effect {effect}")
-        self._record(f"Started effect {effect}")
+        self._record(f"Started effect {effect} at {speed or self.effect_speed}% speed")
         self.async_update_listeners()
+
+    async def async_set_effect_speed(self, speed: int) -> None:
+        """Set the speed for effects; a running effect that follows it restarts."""
+        self.effect_speed = speed
+        if self.effect and self.effect_speed_override is None:
+            await self.async_start_effect(self.effect, self._effect_brightness)
 
     async def async_stop_effect(self) -> None:
         """Stop the running effect, if any (the lamp keeps its last color)."""

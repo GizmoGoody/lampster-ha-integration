@@ -1,0 +1,32 @@
+start_effect:
+  target:
+    entity:
+      integration: lampster
+      domain: light
+  fields:
+    effect:
+      required: true
+      selector:
+        select:
+          translation_key: effect
+          options:
+            - colorloop
+            - random
+            - candle
+            - fireplace
+            - breathe
+    speed:
+      selector:
+        number:
+          min: 25
+          max: 200
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+    brightness_pct:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+          mode: slider

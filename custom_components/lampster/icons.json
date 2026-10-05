@@ -47,6 +47,16 @@
           "disconnected": "mdi:bluetooth-off"
         }
       }
+    },
+    "number": {
+      "effect_speed": {
+        "default": "mdi:speedometer"
+      }
+    }
+  },
+  "services": {
+    "start_effect": {
+      "service": "mdi:creation"
     }
   }
 }

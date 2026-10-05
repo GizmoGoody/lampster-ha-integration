@@ -13,7 +13,9 @@ from custom_components.lampster.effects import (
     color_values,
     current_color,
     effect_mode,
+    Step,
     effect_steps,
+    scale_steps,
     transition_steps,
     zero_color,
 )
@@ -52,6 +54,15 @@ def test_effect_steps_are_valid(effect: str) -> None:
     for step in itertools.islice(effect_steps(effect, 200, state), 200):
         assert step.delay > 0
         assert all(0 <= value <= 100 for value in color_values(step.color))
+
+
+def test_scale_steps_speed() -> None:
+    """Effect speed scales step times, never shorter than 0.1 s when sped up."""
+    steps = [Step(RGBColor(1, 0, 0), 1.0), Step(RGBColor(2, 0, 0), 0.15), Step(RGBColor(3, 0, 0), 0.08)]
+    assert [s.delay for s in scale_steps(iter(steps), 100)] == [1.0, 0.15, 0.08]
+    assert [s.delay for s in scale_steps(iter(steps), 200)] == [0.5, 0.1, 0.08]
+    assert [s.delay for s in scale_steps(iter(steps), 25)] == [4.0, 0.6, 0.32]
+    assert [s.color for s in scale_steps(iter(steps), 50)] == [s.color for s in steps]
 
 
 def test_effect_modes() -> None:

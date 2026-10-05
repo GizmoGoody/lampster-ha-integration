@@ -64,6 +64,11 @@
           }
         }
       }
+    },
+    "number": {
+      "effect_speed": {
+        "name": "Effect speed"
+      }
     }
   },
   "options": {
@@ -100,6 +105,37 @@
     "no_connection_slot": {
       "title": "No free Bluetooth connection slot for The Lampster",
       "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row because every connection slot on the Bluetooth adapters and proxies that can reach it is in use. The last error was: {error}\n\nFree a slot by disconnecting another Bluetooth device, turn off \"Maintain Bluetooth connection at all times\" for devices that do not need it, or add another Bluetooth proxy near The Lampster. This notice clears itself once a connection succeeds."
+    }
+  },
+  "selector": {
+    "effect": {
+      "options": {
+        "colorloop": "Color Loop",
+        "random": "Random",
+        "candle": "Candle",
+        "fireplace": "Fireplace",
+        "breathe": "Breathe"
+      }
+    }
+  },
+  "services": {
+    "start_effect": {
+      "name": "Start effect",
+      "description": "Starts an effect on The Lampster, optionally at its own speed and brightness. Effects chosen from the light itself run at the Effect speed setting.",
+      "fields": {
+        "effect": {
+          "name": "Effect",
+          "description": "The effect to start."
+        },
+        "speed": {
+          "name": "Speed",
+          "description": "Speed for this run, in percent of normal. Leave empty to use the Effect speed setting."
+        },
+        "brightness_pct": {
+          "name": "Brightness",
+          "description": "Brightness for this run. Leave empty to use the light's current brightness."
+        }
+      }
     }
   }
 }

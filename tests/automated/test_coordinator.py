@@ -24,6 +24,7 @@ from custom_components.lampster.coordinator import (
     LampsterCoordinator,
 )
 from custom_components.lampster.lampster.models import RGBColor, WhiteColor
+from custom_components.lampster.light import LampsterLight
 
 from .conftest import ADDRESS, FakeBleakClient, FakeLamp
 
@@ -294,6 +295,38 @@ async def test_touch_hold_during_effect_stays_on(
     assert lamp.mode & 0x80
     assert coordinator.effect is None
     assert coordinator.data.mode == "white"
+
+
+async def test_effect_speed_restarts_running_effect(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Changing the Effect speed restarts an effect that follows it, not one with its own."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_start_effect("colorloop", 200)
+    first = coordinator._task
+    await coordinator.async_set_effect_speed(150)
+    assert coordinator.effect == "colorloop"
+    assert coordinator._task is not first  # restarted at the new speed
+
+    await coordinator.async_start_effect("colorloop", 200, speed=50)
+    own_speed = coordinator._task
+    await coordinator.async_set_effect_speed(75)
+    assert coordinator._task is own_speed
+    assert coordinator.effect_speed_override == 50
+
+
+async def test_start_effect_action(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """The action starts an effect with its own speed and brightness."""
+    coordinator = make_coordinator(always_connected=True)
+    light = LampsterLight(coordinator)
+    with patch.object(coordinator, "async_start_effect") as start:
+        await light.async_start_effect_action("fireplace", speed=150, brightness_pct=40)
+        start.assert_awaited_once_with("fireplace", 102, 150)
+        start.reset_mock()
+        await light.async_start_effect_action("candle")
+        start.assert_awaited_once_with("candle", 255, None)
 
 
 async def test_repair_issue_raised_and_cleared(

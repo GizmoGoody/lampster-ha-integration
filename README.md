@@ -109,6 +109,20 @@ Effects are chosen from the light card or with `light.turn_on`:
 
 The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or pressing the touch button stops an effect. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
 
+**Effect speed**: the *Effect speed* setting on the device page (25% to 200%, default 100%) speeds up or slows down every effect chosen from the light, including from its more-info dialog. Changing it restarts a running effect at the new speed. It is capped at 200% so effects stay within what the Bluetooth connection keeps up with.
+
+To give one run its own speed or brightness, for example in an automation, use the **Start effect** action:
+
+```yaml
+action: lampster.start_effect
+target:
+  entity_id: light.lampster
+data:
+  effect: breathe
+  speed: 50           # optional, percent; otherwise the Effect speed setting
+  brightness_pct: 40  # optional; otherwise the light's current brightness
+```
+
 Transitions fade over the given number of seconds:
 
 ```yaml
