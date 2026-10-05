@@ -57,25 +57,28 @@ def test_effect_steps_are_valid(effect: str) -> None:
 
 
 def test_fireworks_bursts_are_spaced() -> None:
-    """Fireworks bursts start at least 0.9 s apart and use firework colors."""
+    """Fireworks shells launch dimly, then burst in a firework color at least 0.9 s apart."""
     random.seed(1)
-    now, last_start, previous_dark, starts = 0.0, None, True, 0
+    colors = (*effects.FIREWORKS_COLORS, effects.FIREWORKS_GOLD)
+    now, last_start, previous, starts, launches = 0.0, None, 0, 0, 0
     for step in itertools.islice(effect_steps("fireworks", 255, None), 5000):
         values = color_values(step.color)
-        bright = max(values) > 50
-        if bright and previous_dark:
+        brightest = max(values)
+        if 0 < previous < 25 and 0 < brightest < 25:
+            launches += 1  # a dim rising trail before a burst
+        if brightest > 50 and previous < 40:
             if last_start is not None:
                 assert now - last_start >= 0.9 - 1e-9
             last_start = now
             starts += 1
-            # A burst starts at full in one of the firework colors
             assert any(
-                all(abs(v - c * max(values) / 100) <= 1 for v, c in zip(values, color))
-                for color in effects.FIREWORKS_COLORS
+                all(abs(v - c * brightest / 100) <= 1 for v, c in zip(values, color))
+                for color in colors
             )
-        previous_dark = max(values) == 0
+        previous = brightest
         now += step.delay
     assert starts > 100
+    assert launches > starts
 
 
 def test_pursuit_alternates_slowly() -> None:

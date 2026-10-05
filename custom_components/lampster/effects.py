@@ -43,11 +43,13 @@ RANDOM_STEP = 5.0
 BREATHE_PERIOD = 5.0
 BREATHE_STEP = 0.2
 BREATHE_MIN = 0.1
-# Fireworks: bursts in common firework colors (red, orange, gold, green, blue,
-# purple, white) that jump to full and fade out, separated by dark gaps.
-# A burst fades for at least 0.6 s and finale bursts are FIREWORKS_FINALE_GAP
-# apart, so bursts start at least 0.9 s apart: well under the usual
-# photosensitivity limit of three flashes in a second.
+# Fireworks: each shell launches as a dim orange trail that slowly brightens,
+# then bursts at full brightness in a firework color (red, orange, gold,
+# green, blue, purple, white) and fades: quickly (peony), changing to a second
+# color (color changer), slowly in gold (willow) or with a crackling flicker.
+# The launch is a gradual rise, so only the burst flashes, and bursts are at
+# least FIREWORKS_MIN_LAUNCH + FIREWORKS_MIN_FADE + one step apart (about a
+# second): well under the usual limit of three flashes in a second.
 FIREWORKS_COLORS = (
     (100, 0, 0),
     (100, 35, 0),
@@ -57,11 +59,18 @@ FIREWORKS_COLORS = (
     (60, 0, 100),
     (100, 100, 100),
 )
+FIREWORKS_GOLD = (100, 55, 0)
+FIREWORKS_TRAIL = (100, 40, 0)
 FIREWORKS_STEP = 0.1
-FIREWORKS_FADE = (0.6, 1.5)
-FIREWORKS_DARK = (0.3, 2.0)
-FIREWORKS_FINALE_CHANCE = 0.2
-FIREWORKS_FINALE_GAP = 0.3
+FIREWORKS_MIN_LAUNCH = 0.3
+FIREWORKS_LAUNCH = (FIREWORKS_MIN_LAUNCH, 0.7)
+FIREWORKS_TRAIL_LEVEL = (0.03, 0.2)  # share of full brightness, start and end
+FIREWORKS_MIN_FADE = 0.6
+FIREWORKS_FADE = (FIREWORKS_MIN_FADE, 1.1)
+FIREWORKS_WILLOW_FADE = (1.5, 2.2)
+FIREWORKS_DARK = (0.1, 0.7)
+FIREWORKS_FINALE_CHANCE = 0.3
+FIREWORKS_FINALE_DARK = 0.1
 # Pursuit: red and blue like police lights, but slow enough to be safe: each
 # color fades in, holds and fades out over half a second, so the color changes
 # twice a second (under the usual limit of three flashes in a second)
@@ -177,25 +186,42 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
 
 
 def _fireworks(level: float) -> Iterator[Step]:
-    """Bursts that jump to full and fade out with a flicker, between dark gaps."""
+    """Shells that launch as a dim rising trail, then burst and fade."""
     dark = RGBColor(0, 0, 0)
+
+    def color_at(color: tuple[int, ...], share: float) -> RGBColor:
+        return RGBColor(*(_pct(c / 100 * level * share) for c in color))
+
     while True:
         yield Step(dark, random.uniform(*FIREWORKS_DARK))
-        # Now and then a finale: two or three bursts in quick succession
-        bursts = random.choice((2, 3)) if random.random() < FIREWORKS_FINALE_CHANCE else 1
-        for burst in range(bursts):
-            color = random.choice(FIREWORKS_COLORS)
-            peak = level * random.uniform(0.75, 1.0)
-            steps = max(2, round(random.uniform(*FIREWORKS_FADE) / FIREWORKS_STEP))
+        # Now and then a finale: two to four shells in quick succession
+        shells = random.randint(2, 4) if random.random() < FIREWORKS_FINALE_CHANCE else 1
+        for shell in range(shells):
+            # Launch: a dim orange trail that slowly brightens as it rises
+            launch = max(2, round(random.uniform(*FIREWORKS_LAUNCH) / FIREWORKS_STEP))
+            low, high = FIREWORKS_TRAIL_LEVEL
+            for i in range(launch):
+                yield Step(color_at(FIREWORKS_TRAIL, low + (high - low) * i / (launch - 1)), FIREWORKS_STEP)
+            # Burst, then fade in one of four styles
+            kind = random.choice(("peony", "peony", "changer", "willow", "crackle"))
+            color = FIREWORKS_GOLD if kind == "willow" else random.choice(FIREWORKS_COLORS)
+            second = random.choice([c for c in FIREWORKS_COLORS if c != color])
+            fade = FIREWORKS_WILLOW_FADE if kind == "willow" else FIREWORKS_FADE
+            steps = max(2, round(random.uniform(*fade) / FIREWORKS_STEP))
+            peak = random.uniform(0.8, 1.0)
             for i in range(steps):
                 remaining = 1 - i / steps
-                # Fast fall-off, with a flicker as the burst dies down
-                factor = remaining**2 * (random.uniform(0.7, 1.0) if i > steps / 2 else 1)
-                yield Step(
-                    RGBColor(*(_pct(c / 100 * peak * factor) for c in color)), FIREWORKS_STEP
-                )
-            if burst < bursts - 1:
-                yield Step(dark, FIREWORKS_FINALE_GAP)
+                share = peak * remaining ** (1.2 if kind == "willow" else 2)
+                # The flicker stays small (a few percent of full brightness),
+                # so it is not a flash
+                if kind == "crackle" and i > 2 * steps / 3:
+                    share *= random.uniform(0.5, 1.0)
+                elif i > steps / 2:
+                    share *= random.uniform(0.8, 1.0)
+                shown = second if kind == "changer" and i >= steps / 2 else color
+                yield Step(color_at(shown, share), FIREWORKS_STEP)
+            if shell < shells - 1:
+                yield Step(dark, FIREWORKS_FINALE_DARK)
 
 
 def _hue_color(hue: float, level: float) -> RGBColor:
