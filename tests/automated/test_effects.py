@@ -84,11 +84,13 @@ def test_fireworks_bursts_are_spaced() -> None:
 def test_pursuit_alternates_slowly() -> None:
     """Pursuit alternates red and blue, changing color twice a second."""
     steps = list(itertools.islice(effect_steps("pursuit", 255, None), 12))
-    assert sum(step.delay for step in steps[:3]) == pytest.approx(0.5)
-    reds = {color_values(step.color)[0] > 0 for step in steps[:3]}
-    blues = {color_values(step.color)[2] > 0 for step in steps[3:6]}
-    assert reds == {True} and blues == {True}
-    assert color_values(steps[1].color) == (100, 0, 0)
+    # Starts straight on full red, then fades out
+    assert color_values(steps[0].color) == (100, 0, 0)
+    assert sum(step.delay for step in steps[:2]) == pytest.approx(0.4)
+    # Then each color takes half a second: blue, red, ...
+    assert sum(step.delay for step in steps[2:5]) == pytest.approx(0.5)
+    assert {color_values(step.color)[2] > 0 for step in steps[2:5]} == {True}
+    assert {color_values(step.color)[0] > 0 for step in steps[5:8]} == {True}
 
 
 def test_effect_modes() -> None:
