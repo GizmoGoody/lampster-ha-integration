@@ -19,12 +19,14 @@ from .lampster.models import LampState, RGBColor, WhiteColor
 EFFECT_CANDLE = "candle"
 EFFECT_FIREPLACE = "fireplace"
 EFFECT_BREATHE = "breathe"
+EFFECT_FIREWORKS = "fireworks"
 EFFECTS = (
     EFFECT_COLORLOOP,
     EFFECT_RANDOM,
     EFFECT_CANDLE,
     EFFECT_FIREPLACE,
     EFFECT_BREATHE,
+    EFFECT_FIREWORKS,
 )
 
 MODE_RGB = "rgb"
@@ -39,6 +41,25 @@ RANDOM_STEP = 5.0
 BREATHE_PERIOD = 5.0
 BREATHE_STEP = 0.2
 BREATHE_MIN = 0.1
+# Fireworks: bursts in common firework colors (red, orange, gold, green, blue,
+# purple, white) that jump to full and fade out, separated by dark gaps.
+# A burst fades for at least 0.6 s and finale bursts are FIREWORKS_FINALE_GAP
+# apart, so bursts start at least 0.9 s apart: well under the usual
+# photosensitivity limit of three flashes in a second.
+FIREWORKS_COLORS = (
+    (100, 0, 0),
+    (100, 35, 0),
+    (100, 70, 5),
+    (0, 100, 10),
+    (0, 25, 100),
+    (60, 0, 100),
+    (100, 100, 100),
+)
+FIREWORKS_STEP = 0.1
+FIREWORKS_FADE = (0.6, 1.5)
+FIREWORKS_DARK = (0.3, 2.0)
+FIREWORKS_FINALE_CHANCE = 0.2
+FIREWORKS_FINALE_GAP = 0.3
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
 
@@ -124,6 +145,8 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
                 RGBColor(_pct(flame), _pct(flame * random.uniform(0.12, 0.4)), 0),
                 random.uniform(0.1, 0.35),
             )
+    elif effect == EFFECT_FIREWORKS:
+        yield from _fireworks(level)
     elif effect == EFFECT_BREATHE:
         mode = effect_mode(effect, state)
         peak = color_values(current_color(state, mode))
@@ -139,6 +162,28 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
             t += BREATHE_STEP
     else:
         raise ValueError(f"Unknown effect: {effect}")
+
+
+def _fireworks(level: float) -> Iterator[Step]:
+    """Bursts that jump to full and fade out with a flicker, between dark gaps."""
+    dark = RGBColor(0, 0, 0)
+    while True:
+        yield Step(dark, random.uniform(*FIREWORKS_DARK))
+        # Now and then a finale: two or three bursts in quick succession
+        bursts = random.choice((2, 3)) if random.random() < FIREWORKS_FINALE_CHANCE else 1
+        for burst in range(bursts):
+            color = random.choice(FIREWORKS_COLORS)
+            peak = level * random.uniform(0.75, 1.0)
+            steps = max(2, round(random.uniform(*FIREWORKS_FADE) / FIREWORKS_STEP))
+            for i in range(steps):
+                remaining = 1 - i / steps
+                # Fast fall-off, with a flicker as the burst dies down
+                factor = remaining**2 * (random.uniform(0.7, 1.0) if i > steps / 2 else 1)
+                yield Step(
+                    RGBColor(*(_pct(c / 100 * peak * factor) for c in color)), FIREWORKS_STEP
+                )
+            if burst < bursts - 1:
+                yield Step(dark, FIREWORKS_FINALE_GAP)
 
 
 def _hue_color(hue: float, level: float) -> RGBColor:

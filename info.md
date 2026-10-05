@@ -8,7 +8,7 @@
 - ✅ **Instant touch button sync** - Taps and holds on The Lampster show up in Home Assistant right away
 - ✅ **Responsive control** - One shared connection; dragging the color wheel is smooth
 - ✅ **Connection settings** - Keep the connection at all times, or set the check interval and hang-on time
-- ✅ **Effects and transitions** - Color Loop, Random, Candle, Fireplace and Breathe; fades on, off and between colors
+- ✅ **Effects and transitions** - Color Loop, Random, Candle, Fireplace, Breathe and Fireworks; fades on, off and between colors
 - ✅ **Brighter whites** - 100% now drives both LEDs fully at in-between color temperatures
 - ✅ **Favorite colors** - Pure colors and ten white temperatures added to the color picker
 - ✅ **Diagnostics** - Connection status, Bluetooth uplink, timing, temperature, diagnostics download and repair notices

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import random
 
 import pytest
 
@@ -17,6 +18,7 @@ from custom_components.lampster.effects import (
     transition_steps,
     zero_color,
 )
+from custom_components.lampster import effects
 from custom_components.lampster.lampster.models import LampState, RGBColor, WhiteColor
 from custom_components.lampster.light import (
     _device_to_kelvin,
@@ -52,6 +54,28 @@ def test_effect_steps_are_valid(effect: str) -> None:
     for step in itertools.islice(effect_steps(effect, 200, state), 200):
         assert step.delay > 0
         assert all(0 <= value <= 100 for value in color_values(step.color))
+
+
+def test_fireworks_bursts_are_spaced() -> None:
+    """Fireworks bursts start at least 0.9 s apart and use firework colors."""
+    random.seed(1)
+    now, last_start, previous_dark, starts = 0.0, None, True, 0
+    for step in itertools.islice(effect_steps("fireworks", 255, None), 5000):
+        values = color_values(step.color)
+        bright = max(values) > 50
+        if bright and previous_dark:
+            if last_start is not None:
+                assert now - last_start >= 0.9 - 1e-9
+            last_start = now
+            starts += 1
+            # A burst starts at full in one of the firework colors
+            assert any(
+                all(abs(v - c * max(values) / 100) <= 1 for v, c in zip(values, color))
+                for color in effects.FIREWORKS_COLORS
+            )
+        previous_dark = max(values) == 0
+        now += step.delay
+    assert starts > 100
 
 
 def test_effect_modes() -> None:
