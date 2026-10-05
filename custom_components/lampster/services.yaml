@@ -7,14 +7,8 @@ start_effect:
     effect:
       required: true
       selector:
-        select:
-          translation_key: effect
-          options:
-            - colorloop
-            - random
-            - candle
-            - fireplace
-            - breathe
+        state:
+          attribute: effect
     speed:
       selector:
         number:

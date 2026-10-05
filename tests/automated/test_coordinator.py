@@ -300,7 +300,7 @@ async def test_touch_hold_during_effect_stays_on(
 async def test_effect_speed_restarts_running_effect(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:
-    """Changing the Effect speed restarts an effect that follows it, not one with its own."""
+    """Changing the Effects speed restarts an effect that follows it, not one with its own."""
     coordinator = make_coordinator(always_connected=True)
     await coordinator.async_start_effect("colorloop", 200)
     first = coordinator._task
@@ -327,6 +327,9 @@ async def test_start_effect_action(
         start.reset_mock()
         await light.async_start_effect_action("candle")
         start.assert_awaited_once_with("candle", 255, None)
+    with patch.object(coordinator, "async_stop_effect") as stop:
+        await light.async_start_effect_action("off")
+        stop.assert_awaited_once()
 
 
 async def test_repair_issue_raised_and_cleared(

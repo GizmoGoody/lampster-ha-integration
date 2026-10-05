@@ -161,7 +161,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data: LampState | None = None
         self.temperature: float | None = None
         self.effect: str | None = None
-        # Speed for effects in percent (the Effect speed setting)
+        # Speed for effects in percent (the Effects speed setting)
         self.effect_speed: int = EFFECT_SPEED_DEFAULT
         # The running effect's own speed when an action started it with one;
         # None when it follows effect_speed

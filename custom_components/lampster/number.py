@@ -1,4 +1,4 @@
-"""Effect speed setting for The Lampster integration."""
+"""Effects speed setting for The Lampster integration."""
 from __future__ import annotations
 
 from homeassistant.components.number import NumberMode, RestoreNumber
@@ -20,17 +20,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up The Lampster settings from a config entry."""
     coordinator: LampsterCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([LampsterEffectSpeed(coordinator)])
+    async_add_entities([LampsterEffectsSpeed(coordinator)])
 
 
-class LampsterEffectSpeed(LampsterEntity, RestoreNumber):
+class LampsterEffectsSpeed(LampsterEntity, RestoreNumber):
     """Speed of the effects, in percent of normal.
 
     Effects chosen from the light (for example in its more-info dialog) run at
     this speed; the start_effect action can give a run its own speed.
     """
 
-    _attr_translation_key = "effect_speed"
+    _attr_translation_key = "effects_speed"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min_value = EFFECT_SPEED_MIN
     _attr_native_max_value = EFFECT_SPEED_MAX
@@ -40,9 +40,9 @@ class LampsterEffectSpeed(LampsterEntity, RestoreNumber):
 
     def __init__(self, coordinator: LampsterCoordinator) -> None:
         """Initialize the setting."""
-        super().__init__(coordinator, "effect_speed")
+        super().__init__(coordinator, "effects_speed")
         # Keep IDs short and stable regardless of the device name
-        self.entity_id = "number.lampster_effect_speed"
+        self.entity_id = "number.lampster_effects_speed"
 
     async def async_added_to_hass(self) -> None:
         """Restore the speed set before Home Assistant restarted."""

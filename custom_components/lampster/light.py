@@ -116,7 +116,7 @@ async def async_setup_entry(
     async_get_current_platform().async_register_entity_service(
         SERVICE_START_EFFECT,
         {
-            vol.Required("effect"): vol.In(EFFECTS),
+            vol.Required("effect"): vol.In([EFFECT_OFF, *EFFECTS]),
             vol.Optional("speed"): vol.All(
                 vol.Coerce(int), vol.Range(min=EFFECT_SPEED_MIN, max=EFFECT_SPEED_MAX)
             ),
@@ -300,14 +300,20 @@ class LampsterLight(LampsterEntity, LightEntity):
     async def async_start_effect_action(
         self, effect: str, speed: int | None = None, brightness_pct: int | None = None
     ) -> None:
-        """Start an effect, optionally at its own speed and brightness (action)."""
+        """Start an effect, optionally at its own speed and brightness (action).
+
+        Off stops the running effect.
+        """
         brightness = (
             round(brightness_pct * 255 / 100)
             if brightness_pct is not None
             else self._attr_brightness or 255
         )
         try:
-            await self.coordinator.async_start_effect(effect, brightness, speed)
+            if effect == EFFECT_OFF:
+                await self.coordinator.async_stop_effect()
+            else:
+                await self.coordinator.async_start_effect(effect, brightness, speed)
         except COMMAND_ERRORS as err:
             raise HomeAssistantError(f"Failed to start the effect: {err}") from err
 

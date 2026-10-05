@@ -57,7 +57,7 @@ def test_effect_steps_are_valid(effect: str) -> None:
 
 
 def test_scale_steps_speed() -> None:
-    """Effect speed scales step times, never shorter than 0.1 s when sped up."""
+    """Effects speed scales step times, never shorter than 0.1 s when sped up."""
     steps = [Step(RGBColor(1, 0, 0), 1.0), Step(RGBColor(2, 0, 0), 0.15), Step(RGBColor(3, 0, 0), 0.08)]
     assert [s.delay for s in scale_steps(iter(steps), 100)] == [1.0, 0.15, 0.08]
     assert [s.delay for s in scale_steps(iter(steps), 200)] == [0.5, 0.1, 0.08]
