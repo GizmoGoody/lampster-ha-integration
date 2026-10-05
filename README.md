@@ -76,13 +76,21 @@ The integration will create a light entity named `light.lampster`.
 
 ### Connection Settings
 
-Go to **Settings** → **Devices & Services** → **The Lampster** → **Configure**. The timing settings appear on a second step, only when *Maintain Bluetooth connection at all times* is unchecked:
+Go to **Settings** → **Devices & Services** → **The Lampster** → **Configure** and choose a connection:
+
+| Connection | Meaning |
+|------------|---------|
+| Periodic (default) | Stays connected while The Lampster is on, and disconnects a while after it is turned off. Selecting Submit opens the timing settings below |
+| Constant | Stays connected at all times, so commands respond faster and touch-button changes show up instantly. Permanently uses one connection slot on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default) |
+
+Timing settings for the Periodic connection (an empty field uses the default):
 
 | Setting | Default | Meaning |
 |---------|---------|---------|
-| Maintain Bluetooth connection at all times | Off | Keep the Bluetooth connection active even while The Lampster is off, so commands are more responsive. Permanently ties up one of the connection slots on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default). |
-| Check interval | 30 s | While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button |
+| Refresh interval | 30 s | While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button |
 | Connection hang-on time | 60 s | How long the connection remains active after The Lampster is turned off |
+
+The timing values are kept when Constant is chosen, and come back when Periodic is chosen again.
 
 ## Usage
 
@@ -210,7 +218,7 @@ Protocol based on reverse engineering by [Noki](https://github.com/Noki/the-lamp
 
 - **While The Lampster is on**, Home Assistant stays connected. The Lampster pushes every change over the connection, including touch button taps and holds, so they show up instantly
 - **After it turns off**, the connection stays open for the configured time (default 60 s), then closes
-- **While off and disconnected**, Home Assistant connects every check interval (default 30 s) to see whether The Lampster was turned on with the touch button, and stays connected if so. The Lampster's Bluetooth advertisement does not include its state, so this is the only way to notice
+- **While off and disconnected**, Home Assistant connects every refresh interval (default 30 s) to see whether The Lampster was turned on with the touch button, and stays connected if so. The Lampster's Bluetooth advertisement does not include its state, so this is the only way to notice
 - **Commands from Home Assistant** connect on demand (1-3 s through a proxy); after that the connection stays open while The Lampster is on
 - Dropped connections are re-established automatically while The Lampster is on
 - While a command is being sent, newer requests replace queued ones, so dragging a color picker sends only the latest color
@@ -266,10 +274,10 @@ The **Connection** diagnostic sensor shows what the connection is doing:
 
 | Status | Meaning |
 |--------|---------|
-| Connected | Holding the connection: The Lampster is on, or *Maintain Bluetooth connection at all times* is enabled |
+| Connected | Holding the connection: The Lampster is on, or the connection is set to Constant |
 | Standby | The Lampster is off; the connection is held until the *Connection hang-on time* runs out |
 | Connecting | Connecting for a command or a reconnect |
-| Checking | Briefly connecting to check whether The Lampster was turned on with the touch button (only when *Maintain Bluetooth connection at all times* is disabled) |
+| Checking | Briefly connecting to check whether The Lampster was turned on with the touch button (only with the Periodic connection) |
 | Reconnecting | The connection dropped unexpectedly; a new attempt is scheduled in 5 seconds |
 | Failed | The last connection attempt or command failed; cleared by the next attempt |
 | Disconnected | Not connected, nothing pending |
@@ -330,7 +338,7 @@ Then restart Home Assistant.
 ## Known Limitations
 
 1. **Single Connection**: The Lampster accepts one Bluetooth connection at a time, so the Lampster app and Home Assistant cannot be used together
-2. **Touch Button While Off**: With the default settings, turning The Lampster on with the touch button is noticed at the next check (within the check interval). Enable *Maintain Bluetooth connection at all times* to make it instant
+2. **Touch Button While Off**: With the default settings, turning The Lampster on with the touch button is noticed at the next check (within the refresh interval). Set the connection to Constant to make it instant
 3. **State Persistence**: Device remembers last color even when powered off
 4. **Range**: Bluetooth LE has limited range (~10m line of sight, less through walls)
 5. **Power Off from RGB**: Requires switching to white mode first (handled automatically)

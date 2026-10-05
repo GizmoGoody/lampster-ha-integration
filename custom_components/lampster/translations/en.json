@@ -69,25 +69,22 @@
   "options": {
     "step": {
       "init": {
-        "title": "Bluetooth connection settings",
-        "description": "The Lampster accepts only one Bluetooth connection at a time, so the Lampster app cannot be used while Home Assistant is connected and vice-versa.",
+        "title": "Bluetooth Connection Options",
+        "description": "Choose how Home Assistant manages the Bluetooth connection to The Lampster. The Lampster accepts only one Bluetooth connection at a time, so the Lampster app cannot be used while Home Assistant is connected.",
         "data": {
-          "always_connected": "Maintain Bluetooth connection at all times"
-        },
-        "data_description": {
-          "always_connected": "Keep the Bluetooth connection active even while The Lampster is off, so commands are more responsive. This permanently ties up one of the connection slots on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default). If this is unchecked, you can select Submit to configure the check interval and connection hang-on time."
+          "connection_mode": "Connection"
         }
       },
       "timing": {
-        "title": "Bluetooth connection timing",
-        "description": "While The Lampster is on, Home Assistant stays connected. These settings control what happens after it is turned off.",
+        "title": "Bluetooth Connection Options",
+        "description": "These settings control the Periodic connection: how often Home Assistant checks The Lampster while it is off, and how long it stays connected after it is turned off.",
         "data": {
-          "poll_interval": "Check interval",
-          "off_disconnect_delay": "Connection hang-on time"
+          "reconnect_interval": "Refresh interval",
+          "disconnect_after": "Connection hang-on time"
         },
         "data_description": {
-          "poll_interval": "While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button. Shorter intervals notice it sooner but connect more often.",
-          "off_disconnect_delay": "How long the connection remains active after The Lampster is turned off."
+          "reconnect_interval": "While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button. Shorter intervals notice it sooner but connect more often.",
+          "disconnect_after": "How long the connection remains active after The Lampster is turned off."
         }
       }
     }
@@ -99,7 +96,15 @@
     },
     "no_connection_slot": {
       "title": "No free Bluetooth connection slot for The Lampster",
-      "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row because every connection slot on the Bluetooth adapters and proxies that can reach it is in use. The last error was: {error}\n\nFree a slot by disconnecting another Bluetooth device, turn off \"Maintain Bluetooth connection at all times\" for devices that do not need it, or add another Bluetooth proxy near The Lampster. This notice clears itself once a connection succeeds."
+      "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row because every connection slot on the Bluetooth adapters and proxies that can reach it is in use. The last error was: {error}\n\nFree a slot by disconnecting another Bluetooth device, choose the Periodic connection instead of Constant for devices that do not need it, or add another Bluetooth proxy near The Lampster. This notice clears itself once a connection succeeds."
+    }
+  },
+  "selector": {
+    "connection_mode": {
+      "options": {
+        "periodic": "Periodic – Stays connected while The Lampster is on, and disconnects a while after it is turned off. Select Submit to set the timing.",
+        "constant": "Constant – Stays connected at all times, so commands respond faster and touch-button changes show up instantly. This permanently uses one connection slot on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default)."
+      }
     }
   }
 }

@@ -7,7 +7,7 @@
 - ✅ **Setup fixed** - The Lampster sets up again on current Home Assistant versions (issue #1)
 - ✅ **Instant touch button sync** - Taps and holds on The Lampster show up in Home Assistant right away
 - ✅ **Responsive control** - One shared connection; dragging the color wheel is smooth
-- ✅ **Connection settings** - Keep the connection at all times, or set the check interval and hang-on time
+- ✅ **Connection settings** - Periodic or Constant connection, with the refresh interval and hang-on time for Periodic
 - ✅ **Effects and transitions** - Color Loop, Random, Candle, Fireplace and Breathe; fades on, off and between colors
 - ✅ **Brighter whites** - 100% now drives both LEDs fully at in-between color temperatures
 - ✅ **Favorite colors** - Pure colors and ten white temperatures added to the color picker
@@ -65,7 +65,7 @@ Control the light like any other HA light:
 - Only one Bluetooth connection at a time (close official app if connected)
 - The Lampster app and Home Assistant cannot be connected at the same time; use one or the other
 - ~10m range depending on environment
-- While The Lampster is off, turning it on by touch is noticed within the check interval (default 30 seconds) unless *Maintain Bluetooth connection at all times* is enabled
+- While The Lampster is off, turning it on by touch is noticed within the refresh interval (default 30 seconds) unless the connection is set to Constant
 
 ### Support
 

@@ -12,13 +12,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
-    CONF_ALWAYS_CONNECTED,
-    CONF_OFF_DISCONNECT_DELAY,
-    CONF_POLL_INTERVAL,
-    DEFAULT_ALWAYS_CONNECTED,
-    DEFAULT_OFF_DISCONNECT_DELAY,
-    DEFAULT_POLL_INTERVAL,
+    CONF_DISCONNECT_AFTER,
+    CONF_RECONNECT_INTERVAL,
+    CONNECTION_CONSTANT,
+    DEFAULT_DISCONNECT_AFTER,
+    DEFAULT_RECONNECT_INTERVAL,
     DOMAIN,
+    get_connection_mode,
 )
 from .coordinator import LampsterCoordinator
 
@@ -50,10 +50,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = LampsterCoordinator(
         hass,
         address,
-        always_connected=options.get(CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED),
-        poll_interval=int(options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)),
+        always_connected=get_connection_mode(options) == CONNECTION_CONSTANT,
+        poll_interval=int(
+            options.get(CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL)
+        ),
         off_disconnect_delay=int(
-            options.get(CONF_OFF_DISCONNECT_DELAY, DEFAULT_OFF_DISCONNECT_DELAY)
+            options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER)
         ),
     )
 

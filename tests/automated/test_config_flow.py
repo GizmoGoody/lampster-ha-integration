@@ -12,10 +12,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.lampster.const import (
-    CONF_ALWAYS_CONNECTED,
-    CONF_OFF_DISCONNECT_DELAY,
-    CONF_POLL_INTERVAL,
+    CONF_CONNECTION_MODE,
+    CONF_DISCONNECT_AFTER,
+    CONF_RECONNECT_INTERVAL,
+    CONNECTION_CONSTANT,
+    CONNECTION_PERIODIC,
+    DEFAULT_DISCONNECT_AFTER,
+    DEFAULT_RECONNECT_INTERVAL,
     DOMAIN,
+    get_connection_mode,
 )
 from custom_components.lampster.diagnostics import async_get_config_entry_diagnostics
 
@@ -82,45 +87,67 @@ async def test_user_flow_picks_device(hass: HomeAssistant) -> None:
     assert result["title"] == "The Lampster"
 
 
-async def test_options_timing_step(hass: HomeAssistant) -> None:
-    """Unchecked: the timing settings are asked on a second step."""
+async def test_options_periodic_asks_timing(hass: HomeAssistant) -> None:
+    """Periodic: the timing settings are asked on a second step."""
     entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS})
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["step_id"] == "init"
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_ALWAYS_CONNECTED: False}
+        result["flow_id"], {CONF_CONNECTION_MODE: CONNECTION_PERIODIC}
     )
     assert result["step_id"] == "timing"
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_POLL_INTERVAL: 45, CONF_OFF_DISCONNECT_DELAY: 120}
+        result["flow_id"], {CONF_RECONNECT_INTERVAL: 45, CONF_DISCONNECT_AFTER: 120}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {
-        CONF_ALWAYS_CONNECTED: False,
-        CONF_POLL_INTERVAL: 45,
-        CONF_OFF_DISCONNECT_DELAY: 120,
+        CONF_CONNECTION_MODE: CONNECTION_PERIODIC,
+        CONF_RECONNECT_INTERVAL: 45,
+        CONF_DISCONNECT_AFTER: 120,
     }
 
 
-async def test_options_always_connected_skips_timing(hass: HomeAssistant) -> None:
-    """Checked: the flow finishes on the first step and keeps timing values."""
+async def test_options_empty_timing_uses_defaults(hass: HomeAssistant) -> None:
+    """Empty timing fields fall back to their defaults."""
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS})
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_CONNECTION_MODE: CONNECTION_PERIODIC}
+    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_RECONNECT_INTERVAL] == DEFAULT_RECONNECT_INTERVAL
+    assert entry.options[CONF_DISCONNECT_AFTER] == DEFAULT_DISCONNECT_AFTER
+
+
+async def test_options_constant_skips_timing(hass: HomeAssistant) -> None:
+    """Constant: the flow finishes on the first step and keeps the timing values."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id=ADDRESS,
         data={CONF_ADDRESS: ADDRESS},
-        options={CONF_POLL_INTERVAL: 45, CONF_OFF_DISCONNECT_DELAY: 120},
+        options={CONF_RECONNECT_INTERVAL: 45, CONF_DISCONNECT_AFTER: 120},
     )
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_ALWAYS_CONNECTED: True}
+        result["flow_id"], {CONF_CONNECTION_MODE: CONNECTION_CONSTANT}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options[CONF_ALWAYS_CONNECTED] is True
-    assert entry.options[CONF_POLL_INTERVAL] == 45
+    assert entry.options[CONF_CONNECTION_MODE] == CONNECTION_CONSTANT
+    assert entry.options[CONF_RECONNECT_INTERVAL] == 45
+
+
+def test_get_connection_mode_default() -> None:
+    """Without a valid stored mode, the connection is Periodic."""
+    assert get_connection_mode({}) == CONNECTION_PERIODIC
+    assert get_connection_mode({CONF_CONNECTION_MODE: "quiet"}) == CONNECTION_PERIODIC
+    assert get_connection_mode({CONF_CONNECTION_MODE: CONNECTION_CONSTANT}) == CONNECTION_CONSTANT
 
 
 async def test_diagnostics_redacts_address(hass: HomeAssistant) -> None:
