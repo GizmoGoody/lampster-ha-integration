@@ -95,6 +95,35 @@ async def test_mode_write_gives_up(lamp: FakeLamp, monkeypatch: pytest.MonkeyPat
         await client._write_mode(0xA8)
 
 
+async def test_mode_switch_writes_color_right_away(
+    lamp: FakeLamp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After switching mode, the new color is written before the wait.
+
+    The lamp shows the color it remembered for the new mode until then.
+    """
+    lamp.mode = 0xA8
+    client = _client(lamp)
+    await client.refresh_state()
+    events: list[str] = []
+    fake = client._client
+    original_write = fake.write_gatt_char
+
+    async def record_write(char: str, data: bytes, response: bool = False) -> None:
+        events.append("mode" if char.startswith(MODE) else "white" if char.startswith(WHITE) else "rgb")
+        await original_write(char, data, response)
+
+    async def record_sleep(_delay: float) -> None:
+        events.append("wait")
+
+    fake.write_gatt_char = record_write
+    monkeypatch.setattr(client_module.asyncio, "sleep", record_sleep)
+    await client.set_white_color(WhiteColor(30, 10))
+    first_mode = events.index("mode")
+    assert events[first_mode + 1] == "white"
+    assert lamp.white == bytes([30, 10])
+
+
 async def test_notifications_update_state(lamp: FakeLamp) -> None:
     """Pushed MODE/WHITE changes update the state and call back."""
     lamp.mode = 0xC8

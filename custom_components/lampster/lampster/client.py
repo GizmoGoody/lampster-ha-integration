@@ -310,8 +310,11 @@ class LampsterClient:
             await self._client.write_gatt_char(CHAR_RGB, color.to_bytes(), response=False)
             await asyncio.sleep(0.2)  # Let color data settle
 
-            # Switch to RGB mode
+            # Switch to RGB mode. The lamp then shows the color it remembered for
+            # that mode, so write the new one right away instead of after the
+            # wait below; otherwise the old color shows for about half a second
             await self.set_rgb_mode()
+            await self._client.write_gatt_char(CHAR_RGB, color.to_bytes(), response=False)
             await asyncio.sleep(0.4)  # Device needs time to process mode change
 
             await self._ensure_on()
@@ -353,8 +356,10 @@ class LampsterClient:
             await self._client.write_gatt_char(CHAR_WHITE, color.to_bytes(), response=False)
             await asyncio.sleep(0.2)  # Let color data settle
 
-            # Switch to white mode
+            # Switch to white mode. The lamp then shows the levels it remembered
+            # for that mode, so write the new ones right away (see set_rgb_color)
             await self.set_white_mode()
+            await self._client.write_gatt_char(CHAR_WHITE, color.to_bytes(), response=False)
             await asyncio.sleep(0.4)  # Device needs time to process mode change
 
             await self._ensure_on()
