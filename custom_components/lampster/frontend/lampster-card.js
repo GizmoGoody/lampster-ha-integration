@@ -5,14 +5,15 @@
  * features and more-info dialog are exactly the tile card's. It only adds:
  * - a style (finish) drawn behind the tile card, with a raised edge,
  * - fasteners drawn on top of it, clear of the icon and the controls,
- * - the controls drawn to match the style, flat, or in an inset channel, and
+ * - the features (such as the brightness slider) on the style, on a flat
+ *   patch of it, or in a channel pressed into the panel, and
  * - a picture of The Lampster's head in place of the tile card's icon, shown
  *   through the tile card's own "show entity picture" option. The light's
  *   color fills the lens. The picture is built in memory; no files are written.
  *
  * Every tile card option works the same way here. The card's own options:
- *   style, paint_color, head_color, pattern, controls_style, fasteners,
- *   fastener_color, fastener_spacing
+ *   style, paint_color, head_color, pattern, features_style, fasteners,
+ *   fastener_color, fastener_spacing, single_row_fasteners
  *
  * Style "none" keeps the tile card's own look from the theme and adds only
  * the head (in head_color) and the fasteners.
@@ -55,7 +56,11 @@ const RANDOMIZED = (style) =>
     : style.startsWith("army_") ? "wear" : style.startsWith("artsy_") ? "splatter"
       : style === "painted" || style.startsWith("color_") ? "sheen" : null;
 
-const CONTROLS_STYLES = [["match", "Match style"], ["flat", "Flat"], ["inset", "Inset"]];
+// "match" is written out and labeled "Match style" wherever it is offered
+const MATCH = ["match", "Match style"];
+const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["channel", "Channel"]];
+// On a single-row card: fasteners in the corners, or one at each end
+const SINGLE_ROW_FASTENERS = [["corners", "Corners"], ["ends", "Ends"]];
 
 const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"], ["socket", "Socket"], ["none", "None"]];
 // Fastener spacing: the number is how many gaps each long edge is divided into
@@ -68,7 +73,8 @@ const DEFAULTS = {
   fasteners: "rivets",
   fastener_color: "match",
   fastener_spacing: 4,
-  controls_style: "match",
+  features_style: "match",
+  single_row_fasteners: "corners",
 };
 const DEFAULT_PATTERN = 17;
 // The card's own options; everything else belongs to the tile card
@@ -83,8 +89,10 @@ function validate(config) {
   if (!SPACINGS.some(([n]) => n === c.fastener_spacing)) {
     throw new Error(`fastener_spacing must be one of ${SPACINGS.map(([n]) => n).join(", ")}`);
   }
-  if (!CONTROLS_STYLES.some(([id]) => id === c.controls_style)) {
-    throw new Error(`controls_style must be one of ${CONTROLS_STYLES.map(([id]) => id).join(", ")}`);
+  for (const [key, options] of [["features_style", FEATURES_STYLES], ["single_row_fasteners", SINGLE_ROW_FASTENERS]]) {
+    if (!options.some(([id]) => id === c[key])) {
+      throw new Error(`${key} must be one of ${options.map(([id]) => id).join(", ")}`);
+    }
   }
   if (c.pattern !== undefined) c.pattern = Math.abs(Math.round(Number(c.pattern))) || DEFAULT_PATTERN;
   return c;
@@ -284,7 +292,7 @@ function drawStyle(config, paint, p, W, H) {
   const star = c === "white" ? "#a3261c" : "#e9e9e6";
   const wear = c === "red" ? "0 0 0 0 .02  0 0 0 0 .015  0 0 0 0 .012" : "0 0 0 0 .42  0 0 0 0 .2  0 0 0 0 .07";
   const edge = c === "red" ? "0 0 0 0 .02  0 0 0 0 .015  0 0 0 0 .012" : "0 0 0 0 .38  0 0 0 0 .18  0 0 0 0 .06";
-  const sx = W - 52, sy = Math.min(46, H / 2);
+  const sx = W / 2, sy = H / 2;  // centered on the card
   const points = Array.from({ length: 10 }, (_, i) => {
     const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 7 : 17;
     return `${(sx + r * Math.cos(a)).toFixed(1)},${(sy + r * Math.sin(a)).toFixed(1)}`;
@@ -340,12 +348,12 @@ function fastenerSymbols(p) {
  * "spacing" gaps, and each short edge is halved again whenever the long-edge
  * gap is at most half of the short edge's current gap.
  *
- * A single-row card has no corner fasteners: one at each end, centered
- * between the top and bottom, and the top and bottom edges divided by the
- * spacing; none along the ends.
+ * A single-row card can instead have one fastener at each end, centered
+ * between the top and bottom (ends), with the top and bottom edges divided
+ * by the spacing and none along the ends.
  */
-function fastenerPositions(spacing, W, H, radius, inset, singleRow) {
-  if (singleRow) {
+function fastenerPositions(spacing, W, H, radius, inset, ends) {
+  if (ends) {
     const points = [[inset, H / 2], [W - inset, H / 2]];
     const gap = (W - 2 * inset) / Math.max(spacing, 1);
     for (let i = 1; i < spacing; i++) points.push([inset + i * gap, inset], [inset + i * gap, H - inset]);
@@ -404,6 +412,75 @@ const lensColor = (stateObj) => {
 };
 
 // ---------------------------------------------------------------------------
+// Features in a channel
+// ---------------------------------------------------------------------------
+
+// Elements matching a selector, looking inside shadow roots (a few levels deep)
+function findDeep(el, selector, depth = 5) {
+  const root = el.shadowRoot;
+  if (!root || depth === 0) return [];
+  const found = [...root.querySelectorAll(selector)];
+  for (const child of root.querySelectorAll("*")) found.push(...findDeep(child, selector, depth - 1));
+  return found;
+}
+
+// The corner radius of a feature's control: the first element inside it,
+// about the feature's size, with rounded corners
+function controlRadius(feature, b) {
+  const stack = [feature];
+  for (let depth = 0; depth < 6 && stack.length; depth++) {
+    const next = [];
+    for (const el of stack) {
+      for (const child of el.shadowRoot ? el.shadowRoot.querySelectorAll("*") : []) {
+        const r = child.getBoundingClientRect();
+        const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius);
+        if (radius > 0 && Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) return radius;
+        if (child.shadowRoot) next.push(child);
+      }
+    }
+    stack.splice(0, stack.length, ...next);
+  }
+  return 12;
+}
+
+/**
+ * The slider in a channel: the unused part shows the channel's floor, the
+ * used part is a textured bar, and the handle is a raised grip. This styles
+ * parts inside Home Assistant's slider; if an update renames them, the
+ * slider simply keeps its usual look.
+ */
+let sliderSheet;
+function styleSlider(slider, on) {
+  const root = slider.shadowRoot;
+  if (!root) return;
+  if (!sliderSheet) {
+    sliderSheet = new CSSStyleSheet();
+    sliderSheet.replaceSync(`
+      :host([lampster-channel]) .slider .slider-track-background { opacity: 0; }
+      :host([lampster-channel]) .slider .slider-track-bar {
+        background-image:
+          repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 1px, rgba(0,0,0,.14) 1px 2px, rgba(0,0,0,0) 2px 4px),
+          linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 45%, rgba(0,0,0,.28));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.3), 1px 0 3px rgba(0,0,0,.45);
+      }
+      :host([lampster-channel]) .slider .slider-track-bar::after {
+        width: 10px; height: 70%; border-radius: 3px;
+        background-color: #c9ced3;
+        background-image:
+          repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 1px, rgba(255,255,255,.5) 1px 2px, rgba(0,0,0,0) 2px 3px),
+          linear-gradient(180deg, #f1f3f5, #aab1b8);
+        background-size: 6px 60%, 100% 100%;
+        background-position: center, center;
+        background-repeat: no-repeat;
+        box-shadow: 0 1px 2px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(0,0,0,.25);
+      }
+    `);
+  }
+  if (!root.adoptedStyleSheets.includes(sliderSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sliderSheet];
+  slider.toggleAttribute("lampster-channel", on);
+}
+
+// ---------------------------------------------------------------------------
 // The card
 // ---------------------------------------------------------------------------
 
@@ -440,7 +517,7 @@ class LampsterCard extends HTMLElement {
         .tile.light { --primary-text-color: #1d2126; --secondary-text-color: #3c434b; text-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
         .tile.dark { --primary-text-color: #f4f4f4; --secondary-text-color: #dadada; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
         #fasteners { z-index: 2; }
-        /* Inset controls: a channel pressed into the panel */
+        /* Channel features: a channel pressed into the panel */
         .channel {
           position: absolute; box-sizing: border-box;
           background: linear-gradient(180deg, rgba(0, 0, 0, .16), rgba(0, 0, 0, .06));
@@ -469,7 +546,7 @@ class LampsterCard extends HTMLElement {
   static getStubConfig(hass) {
     const entities = Object.keys(hass.states).filter((id) => id.startsWith("light."));
     const entity = entities.find((id) => hass.entities?.[id]?.platform === "lampster") ?? entities[0] ?? "";
-    return { entity, features: [{ type: "light-brightness" }], style: DEFAULTS.style, fasteners: DEFAULTS.fasteners, fastener_spacing: DEFAULTS.fastener_spacing };
+    return explicit({ entity, features: [{ type: "light-brightness" }] });
   }
 
   setConfig(config) {
@@ -579,7 +656,7 @@ class LampsterCard extends HTMLElement {
    */
   _controls() {
     const root = this._tile?.shadowRoot;
-    if (!root) return { icon: [], features: [] };
+    if (!root) return { icon: [], features: [], sliders: [] };
     const origin = this._frame.getBoundingClientRect();
     const box = (el) => {
       const r = el.getBoundingClientRect();
@@ -591,9 +668,21 @@ class LampsterCard extends HTMLElement {
       this._watched = features;
       this._resize.observe(features);
     }
-    // Each control, or all of them together if they cannot be told apart
-    const each = [...(features?.shadowRoot?.querySelectorAll("hui-card-feature") ?? [])].map(box).filter(Boolean);
-    return { icon: find("ha-tile-icon, ha-tile-info"), features: each.length ? each : find("hui-card-features") };
+    // Each feature, or all of them together if they cannot be told apart.
+    // A feature's corner radius is its control's (such as the slider's), so
+    // a channel around it can follow the same curve.
+    const parts = [...(features?.shadowRoot?.querySelectorAll("hui-card-feature") ?? [])];
+    const each = parts.map((el) => {
+      const b = box(el);
+      if (b) b.radius = controlRadius(el, b);
+      return b;
+    }).filter(Boolean);
+    const sliders = parts.flatMap((el) => findDeep(el, "ha-control-slider"));
+    return {
+      icon: find("ha-tile-icon, ha-tile-info"),
+      features: each.length ? each : find("hui-card-features").map((b) => ({ ...b, radius: 12 })),
+      sliders,
+    };
   }
 
   _draw() {
@@ -608,19 +697,24 @@ class LampsterCard extends HTMLElement {
     const controls = this._controls();
     const root = this.shadowRoot;
 
-    // The controls: on the style itself, on a flat patch of the style's base
-    // (no rust, wear or splatter), or in a channel pressed into the panel
-    const controlsStyle = look.theme ? "match" : this._config.controls_style;
+    // The features: on the style itself, on a flat patch of the style's base
+    // (no rust, wear or splatter), or in a channel pressed into the panel.
+    // The channel's corners are concentric with the feature's.
+    const featuresStyle = look.theme ? "match" : this._config.features_style;
     this._frame.classList.toggle("styled", !look.theme);
-    const pad = controlsStyle === "inset" ? 3 : 0;
-    const areas = controlsStyle === "match" ? [] : controls.features.map((b) => ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }));
+    const pad = featuresStyle === "channel" ? 3 : 0;
+    const areas = featuresStyle === "match" ? [] : controls.features.map((b) =>
+      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: Math.min(b.radius + pad, (b.h + 2 * pad) / 2) }));
     let texture = look.svg;
     if (areas.length && texture) {
-      const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="12" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
+      const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
       texture = `<defs><mask id="${p}clear"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs><g mask="url(#${p}clear)">${texture}</g>`;
     }
-    root.getElementById("channels").innerHTML = controlsStyle !== "inset" ? "" : areas.map((b) =>
-      `<div class="channel" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${Math.min(14, b.h / 2)}px"></div>`).join("");
+    root.getElementById("channels").innerHTML = featuresStyle !== "channel" ? "" : areas.map((b) =>
+      `<div class="channel" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
+    // In a channel, sliders look like a physical slide: a textured bar with a
+    // grip, running over the channel's own floor
+    for (const slider of controls.sliders) styleSlider(slider, featuresStyle === "channel");
     root.getElementById("bg").style.background = look.bg;
     root.getElementById("texture").innerHTML = `<defs>${textureFilters(p, this._config.pattern)}</defs>${texture}`;
     root.getElementById("gloss").style.background = look.gloss ? GLOSS : "none";
@@ -644,7 +738,8 @@ class LampsterCard extends HTMLElement {
         const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
         return Math.hypot(x - nx, y - ny) > size / 2 + (compact ? 0.5 : 1.5);
       });
-      const { points, fixed } = fastenerPositions(spacing, W, H, radius, inset, compact);
+      const ends = compact && this._config.single_row_fasteners === "ends";
+      const { points, fixed } = fastenerPositions(spacing, W, H, radius, inset, ends);
       markup = `<defs>${fastenerSymbols(p)}</defs>` +
         points
           .filter(([x, y], i) => i < fixed || clear(x, y))
@@ -712,7 +807,8 @@ const LABELS = {
   fasteners: "Fasteners",
   fastener_color: "Fastener color",
   fastener_spacing: "Fastener spacing",
-  controls_style: "Controls style",
+  features_style: "Features style",
+  single_row_fasteners: "Single-row fasteners",
 };
 
 const COLOR_HELP = "Pick a theme color from the list, or type any CSS color, such as #1f6f78, rgb(31, 111, 120) or a color name like goldenrod, and select Custom color";
@@ -748,6 +844,19 @@ class LampsterCardEditor extends HTMLElement {
         ha-form { display: block; }
         .row { display: flex; align-items: center; gap: 12px; margin: 24px 0; }
         .row ha-form { flex: 1; }
+        .label { color: var(--primary-text-color); margin-bottom: 8px; }
+        .choices { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+        .choices button {
+          width: 56px; height: 56px; padding: 0; display: grid; place-items: center; cursor: pointer;
+          background: var(--card-background-color, transparent);
+          border: 1px solid var(--outline-color, var(--divider-color)); border-radius: var(--ha-border-radius-md, 8px);
+        }
+        .choices button[aria-checked="true"] {
+          border: 2px solid var(--primary-color);
+          background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+        }
+        .choices button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .choices img { width: 36px; height: 36px; pointer-events: none; }
       </style>
       <div id="tile"></div>
       <ha-expansion-panel outlined expanded>
@@ -759,6 +868,8 @@ class LampsterCardEditor extends HTMLElement {
             <ha-button id="randomize"></ha-button>
             <ha-form id="controls"></ha-form>
           </div>
+          <div class="label" id="fastenersLabel">Fasteners</div>
+          <div class="choices" id="fastenerChoices" role="radiogroup" aria-labelledby="fastenersLabel"></div>
           <ha-form id="fasteners"></ha-form>
         </div>
       </ha-expansion-panel>`;
@@ -769,6 +880,29 @@ class LampsterCardEditor extends HTMLElement {
       form.computeHelper = (schema) => (schema.selector?.ui_color ? COLOR_HELP : undefined);
       form.addEventListener("value-changed", (ev) => this._formChanged(ev));
     }
+    // Fasteners: a picture of each, chosen like radio buttons
+    const choices = this.shadowRoot.getElementById("fastenerChoices");
+    for (const [value, label] of FASTENERS) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "radio");
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.dataset.value = value;
+      button.innerHTML = `<img alt="" src="${fastenerPicture(value)}">`;
+      button.addEventListener("click", () => this._update({ fasteners: value }));
+      choices.append(button);
+    }
+    choices.addEventListener("keydown", (ev) => {
+      // Arrow keys move between the choices, like radio buttons
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+      if (!step) return;
+      ev.preventDefault();
+      const index = FASTENERS.findIndex(([value]) => value === validateForEditor(this._config).fasteners);
+      const [value] = FASTENERS[(index + step + FASTENERS.length) % FASTENERS.length];
+      this._update({ fasteners: value });
+      choices.querySelector(`[data-value="${value}"]`).focus();
+    });
     this.shadowRoot.getElementById("randomize").addEventListener("click", () => {
       this._update({ pattern: 1 + Math.floor(Math.random() * 99999) });
     });
@@ -787,10 +921,13 @@ class LampsterCardEditor extends HTMLElement {
 
   // Called with every change, including edits in the YAML editor
   setConfig(config) {
-    this._config = { ...config };
+    this._config = explicit(config);
     this._collection = undefined;
     this._render();
     this._setTileEditorConfig();
+    // Options left out (defaults included) are written out, so the YAML
+    // always shows what the card uses
+    if (JSON.stringify(this._config) !== JSON.stringify(config)) this._fire();
   }
 
   async _setTileEditorConfig() {
@@ -830,32 +967,26 @@ class LampsterCardEditor extends HTMLElement {
     look.schema = [
       none
         // The theme's own tile: only the head's color to choose
-        ? { type: "grid", name: "", schema: [collectionField, { name: "head_color", selector: { ui_color: { default_color: DEFAULTS.head_color } } }] }
+        ? { type: "grid", name: "", schema: [collectionField, { name: "head_color", selector: { ui_color: {} } }] }
         : { type: "grid", name: "", schema: [collectionField, { name: "style", selector: select(collection.styles) }] },
-      ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: { default_color: DEFAULTS.paint_color } } }] : []),
+      ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: {} } }] : []),
     ];
-    // Randomize and Controls style do not apply to the theme's own tile
+    // Randomize and Features style do not apply to the theme's own tile
     this.shadowRoot.getElementById("row").style.display = none ? "none" : "";
-    controls.schema = [{ name: "controls_style", selector: select(CONTROLS_STYLES) }];
-    fasteners.schema = [
+    controls.schema = [{ name: "features_style", selector: select(FEATURES_STYLES) }];
+    for (const button of this.shadowRoot.querySelectorAll("#fastenerChoices button")) {
+      const checked = button.dataset.value === c.fasteners;
+      button.setAttribute("aria-checked", String(checked));
+      button.tabIndex = checked ? 0 : -1;
+    }
+    fasteners.schema = c.fasteners === "none" ? [] : [
       {
-        name: "fasteners",
-        selector: {
-          select: {
-            mode: "box", box_max_columns: FASTENERS.length,
-            options: FASTENERS.map(([value, label]) => ({ value, label, image: fastenerPicture(value) })),
-          },
-        },
-      },
-      ...(c.fasteners === "none" ? [] : [{
         type: "grid", name: "", schema: [
           { name: "fastener_spacing", selector: select(SPACINGS) },
-          {
-            name: "fastener_color",
-            selector: { ui_color: { default_color: "match", extra_options: [{ value: "match", label: "Match style" }] } },
-          },
+          { name: "single_row_fasteners", selector: select(SINGLE_ROW_FASTENERS) },
         ],
-      }]),
+      },
+      { name: "fastener_color", selector: { ui_color: { extra_options: [{ value: MATCH[0], label: MATCH[1] }] } } },
     ];
     const data = { ...c, collection: collection.id, fastener_spacing: String(c.fastener_spacing) };
     for (const form of this._forms) form.data = data;
@@ -888,7 +1019,7 @@ class LampsterCardEditor extends HTMLElement {
   }
 
   _update(changes) {
-    this._config = { ...this._config, ...changes };
+    this._config = explicit({ ...this._config, ...changes });
     this._render();
     this._fire();
   }
@@ -896,6 +1027,23 @@ class LampsterCardEditor extends HTMLElement {
   _fire() {
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
   }
+}
+
+/**
+ * The configuration with every option the chosen style uses written out,
+ * defaults included (so "match" appears in the YAML); options a style does
+ * not use (such as paint_color for anything but Painted) are left as they are.
+ */
+function explicit(config) {
+  const c = { ...config };
+  const style = STYLES[c.style] ? c.style : DEFAULTS.style;
+  const keys = ["style", "fasteners"];
+  if (style === "painted") keys.push("paint_color");
+  if (style === "none") keys.push("head_color");
+  else keys.push("features_style");
+  if ((c.fasteners ?? DEFAULTS.fasteners) !== "none") keys.push("fastener_color", "fastener_spacing", "single_row_fasteners");
+  for (const key of keys) if (c[key] === undefined) c[key] = DEFAULTS[key];
+  return c;
 }
 
 // The editor shows what the card would draw, without failing on a half-typed YAML value
