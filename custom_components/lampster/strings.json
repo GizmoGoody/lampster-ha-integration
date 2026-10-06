@@ -70,7 +70,7 @@
     "step": {
       "init": {
         "title": "Bluetooth connection settings",
-        "description": "The Lampster accepts only one Bluetooth connection at a time, so the Lampster app cannot be used while Home Assistant is connected and vice-versa.",
+        "description": "The Lampster accepts only one Bluetooth connection at a time, so The Lampster app cannot be used while Home Assistant is connected and vice-versa.",
         "data": {
           "always_connected": "Maintain Bluetooth connection at all times"
         },
@@ -95,7 +95,7 @@
   "issues": {
     "cannot_connect": {
       "title": "The Lampster cannot be reached",
-      "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row. The last error was: {error}\n\nCheck that the Lampster app is not connected to The Lampster, that The Lampster is plugged in, and that it is within range of a Bluetooth adapter or proxy. This notice clears itself once a connection succeeds."
+      "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row. The last error was: {error}\n\nCheck that The Lampster app is not connected to The Lampster, that The Lampster is plugged in, and that it is within range of a Bluetooth adapter or proxy. This notice clears itself once a connection succeeds."
     },
     "no_connection_slot": {
       "title": "No free Bluetooth connection slot for The Lampster",
@@ -103,7 +103,7 @@
     },
     "not_heard": {
       "title": "The Lampster cannot be found",
-      "description": "Home Assistant has not heard The Lampster for several minutes and is not connected to it. The Lampster stops sending Bluetooth signals while something else is connected to it, and it can also stop responding until it is power-cycled.\n\nTry these in order:\n1. Close the Lampster app.\n2. Unplug The Lampster for about 10 seconds, then plug it back in.\n3. Check the nearest Bluetooth adapter or proxy.\n4. Connect once with the Lampster app, then repeat starting at step 1.\n\nThis notice clears itself as soon as Home Assistant hears The Lampster again."
+      "description": "Home Assistant has not heard The Lampster for several minutes and is not connected to it. The Lampster stops sending Bluetooth signals while something else is connected to it, and it can also stop responding until it is power-cycled.\n\nTry these in order:\n1. Close The Lampster app.\n2. Unplug The Lampster for about 10 seconds, then plug it back in.\n3. Check the nearest Bluetooth adapter or proxy.\n4. Connect once with The Lampster app, then repeat starting at step 1.\n\nThis notice clears itself as soon as Home Assistant hears The Lampster again."
     }
   }
 }

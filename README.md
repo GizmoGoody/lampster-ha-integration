@@ -309,7 +309,7 @@ Connection dropped unexpectedly; reconnecting in 5 s
 
 If Home Assistant fails to connect to The Lampster 5 times in a row, a repair notice appears under **Settings** → **Repairs**. A separate notice explains when every Bluetooth connection slot that can reach The Lampster is in use. Both clear themselves once a connection succeeds.
 
-If no Bluetooth adapter or proxy has heard The Lampster for about 5 minutes while Home Assistant is not connected to it, a **The Lampster cannot be found** notice appears instead, with the fixes to try: close the Lampster app; unplug The Lampster for about 10 seconds, then plug it back in; check the nearest Bluetooth adapter or proxy; and if it still cannot be found, connect once with the Lampster app, then repeat from the first step. The Lampster stops advertising while the Lampster app is connected, and its firmware can occasionally stop responding until it is power-cycled. The notice clears itself as soon as The Lampster is heard again.
+If no Bluetooth adapter or proxy has heard The Lampster for about 5 minutes while Home Assistant is not connected to it, a **The Lampster cannot be found** notice appears instead, with the fixes to try: close The Lampster app; unplug The Lampster for about 10 seconds, then plug it back in; check the nearest Bluetooth adapter or proxy; and if it still cannot be found, connect once with The Lampster app, then repeat from the first step. The Lampster stops advertising while The Lampster app is connected, and its firmware can occasionally stop responding until it is power-cycled. The notice clears itself as soon as The Lampster is heard again.
 
 ### Enable Debug Logging
 
@@ -329,7 +329,7 @@ Then restart Home Assistant.
 
 ## Known Limitations
 
-1. **Single Connection**: The Lampster accepts one Bluetooth connection at a time, so the Lampster app and Home Assistant cannot be used together
+1. **Single Connection**: The Lampster accepts one Bluetooth connection at a time, so The Lampster app and Home Assistant cannot be used together
 2. **Touch Button While Off**: With the default settings, turning The Lampster on with the touch button is noticed at the next check (within the check interval). Enable *Maintain Bluetooth connection at all times* to make it instant
 3. **State Persistence**: Device remembers last color even when powered off
 4. **Range**: Bluetooth LE has limited range (~10m line of sight, less through walls)
