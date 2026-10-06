@@ -106,7 +106,7 @@ Effects are chosen from the light card or with `light.turn_on`:
 | Candle | Warm white with an irregular flicker |
 | Fireplace | Red and orange embers that flare and fade |
 | Breathe | The current color slowly brightens and dims |
-| Fireworks | Each shell launches as a dim orange trail that slowly brightens, then bursts in red, orange, gold, green, blue, purple or white and fades: quickly, changing color, slowly in gold (willow) or with a crackle. Sometimes several shells come in a row like a finale. Bursts are at least a second apart |
+| Fireworks | The Lampster turns off; after 1 to 5 seconds an orange trail slowly brightens from off to 20% over 3 to 5 seconds, then the shell bursts in red, orange, gold, green, blue, purple or white (50%, then at once 80 to 100%) and fades back to off over 1 to 3 seconds. Then the next shell. Ignores the light's brightness; follows the Effects speed |
 | Pursuit | Red and blue in turn, like police lights, each fading in and out over half a second. Slower than real police lights on purpose, so it stays under three flashes a second |
 
 The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or pressing the touch button stops an effect. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.

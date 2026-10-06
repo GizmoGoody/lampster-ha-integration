@@ -43,37 +43,28 @@ RANDOM_STEP = 5.0
 BREATHE_PERIOD = 5.0
 BREATHE_STEP = 0.2
 BREATHE_MIN = 0.1
-# Fireworks: each shell launches as a dim orange trail that slowly brightens,
-# then bursts at full brightness in a firework color (red, orange, gold,
-# green, blue, purple, white) and fades: quickly (peony), changing to a second
-# color (color changer), slowly in gold (willow) or with a crackling flicker.
-# The launch is a gradual rise, so only the burst flashes, and bursts are at
-# least FIREWORKS_MIN_LAUNCH + FIREWORKS_MIN_FADE + one step apart (about a
-# second): well under the usual limit of three flashes in a second.
+# Fireworks: the lamp is off; after 1-5 s an orange trail ramps up from off
+# to 20% over 3-5 s; the shell then bursts in a firework color (50%, then at
+# once its peak of 80-100%) and fades back to off over 1-3 s. Then the next
+# shell. It ignores the light's brightness. Bursts are at least 4 s apart (2 s
+# at 200% Effects speed), well under three flashes in a second.
 FIREWORKS_COLORS = (
-    (100, 0, 0),
-    (100, 35, 0),
-    (100, 70, 5),
-    (0, 100, 10),
-    (0, 25, 100),
-    (60, 0, 100),
-    (100, 100, 100),
+    (100, 0, 0),  # red
+    (100, 35, 0),  # orange
+    (100, 70, 5),  # gold
+    (0, 100, 10),  # green
+    (0, 25, 100),  # blue
+    (60, 0, 100),  # purple
+    (100, 100, 100),  # white
 )
-FIREWORKS_GOLD = (100, 55, 0)
-FIREWORKS_TRAIL = (100, 40, 0)
+FIREWORKS_TRAIL = (100, 40, 0)  # orange
 FIREWORKS_STEP = 0.1
-FIREWORKS_MIN_LAUNCH = 0.6
-FIREWORKS_LAUNCH = (FIREWORKS_MIN_LAUNCH, 2.5)  # some shells climb fast, some slowly
-FIREWORKS_TRAIL_LEVEL = 0.2  # share of full brightness the trail rises to from dark
-FIREWORKS_MIN_FADE = 0.6
-FIREWORKS_FADE = (FIREWORKS_MIN_FADE, 1.1)
-FIREWORKS_WILLOW_FADE = (1.5, 2.2)
-# Fully dark before every shell, now and then for a longer lull
-FIREWORKS_DARK = (0.5, 3.0)
-FIREWORKS_LULL_CHANCE = 0.2
-FIREWORKS_LULL = (3.0, 7.0)
-FIREWORKS_FINALE_CHANCE = 0.3
-FIREWORKS_FINALE_DARK = (0.5, 0.8)
+FIREWORKS_OFF = (1.0, 5.0)  # seconds off before each shell
+FIREWORKS_TRAIL_TIME = (3.0, 5.0)  # seconds the trail ramps up
+FIREWORKS_TRAIL_LEVEL = 20  # percent the trail ends at
+FIREWORKS_BURST_START = 50  # percent the burst starts at
+FIREWORKS_PEAK = (80, 100)  # percent the burst peaks at
+FIREWORKS_FADE = (1.0, 3.0)  # seconds the burst fades to off
 # Pursuit: red and blue like police lights, but slow enough to be safe: each
 # color fades in, holds and fades out over half a second, so the color changes
 # twice a second (under the usual limit of three flashes in a second)
@@ -169,7 +160,7 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
                 random.uniform(0.1, 0.35),
             )
     elif effect == EFFECT_FIREWORKS:
-        yield from _fireworks(level)
+        yield from _fireworks()
     elif effect == EFFECT_PURSUIT:
         first = True
         while True:
@@ -196,47 +187,32 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
         raise ValueError(f"Unknown effect: {effect}")
 
 
-def _fireworks(level: float) -> Iterator[Step]:
-    """Shells that launch as a dim rising trail, then burst and fade."""
-    dark = None  # off: all channels at zero would leave a dim green glow
+def _fireworks() -> Iterator[Step]:
+    """Shells that climb as an orange trail, burst in a color and fade to off."""
 
-    def color_at(color: tuple[int, ...], share: float) -> RGBColor | None:
-        shown = RGBColor(*(_pct(c / 100 * level * share) for c in color))
+    def shown(color: tuple[int, ...], percent: float) -> RGBColor | None:
+        rgb = RGBColor(*(_pct(c / 100 * percent) for c in color))
         # Too dim to show anything: off, since all zero glows dim green
-        return shown if any(shown.to_bytes()) else None
+        return rgb if any(rgb.to_bytes()) else None
 
     while True:
-        lull = random.random() < FIREWORKS_LULL_CHANCE
-        yield Step(dark, random.uniform(*(FIREWORKS_LULL if lull else FIREWORKS_DARK)))
-        # Now and then a finale: two to four shells in quick succession
-        shells = random.randint(2, 4) if random.random() < FIREWORKS_FINALE_CHANCE else 1
-        for shell in range(shells):
-            # Launch: a dim orange trail that fades up from dark as it climbs,
-            # slowly at first, then faster
-            launch = max(2, round(random.uniform(*FIREWORKS_LAUNCH) / FIREWORKS_STEP))
-            for i in range(launch):
-                share = FIREWORKS_TRAIL_LEVEL * ((i + 1) / launch) ** 1.5
-                yield Step(color_at(FIREWORKS_TRAIL, share), FIREWORKS_STEP)
-            # Burst, then fade in one of four styles
-            kind = random.choice(("peony", "peony", "changer", "willow", "crackle"))
-            color = FIREWORKS_GOLD if kind == "willow" else random.choice(FIREWORKS_COLORS)
-            second = random.choice([c for c in FIREWORKS_COLORS if c != color])
-            fade = FIREWORKS_WILLOW_FADE if kind == "willow" else FIREWORKS_FADE
-            steps = max(2, round(random.uniform(*fade) / FIREWORKS_STEP))
-            peak = random.uniform(0.8, 1.0)
-            for i in range(steps):
-                remaining = 1 - i / steps
-                share = peak * remaining ** (1.2 if kind == "willow" else 2)
-                # The flicker stays small (a few percent of full brightness),
-                # so it is not a flash
-                if kind == "crackle" and i > 2 * steps / 3:
-                    share *= random.uniform(0.5, 1.0)
-                elif i > steps / 2:
-                    share *= random.uniform(0.8, 1.0)
-                shown = second if kind == "changer" and i >= steps / 2 else color
-                yield Step(color_at(shown, share), FIREWORKS_STEP)
-            if shell < shells - 1:
-                yield Step(dark, random.uniform(*FIREWORKS_FINALE_DARK))
+        yield Step(None, random.uniform(*FIREWORKS_OFF))
+        # Trail: orange ramping up from off to FIREWORKS_TRAIL_LEVEL
+        climb = max(2, round(random.uniform(*FIREWORKS_TRAIL_TIME) / FIREWORKS_STEP))
+        for i in range(1, climb + 1):
+            yield Step(shown(FIREWORKS_TRAIL, FIREWORKS_TRAIL_LEVEL * i / climb), FIREWORKS_STEP)
+        # Burst: bright at once, then brighter still
+        color = random.choice(FIREWORKS_COLORS)
+        peak = random.uniform(*FIREWORKS_PEAK)
+        yield Step(shown(color, FIREWORKS_BURST_START), FIREWORKS_STEP)
+        yield Step(shown(color, peak), FIREWORKS_STEP)
+        # Fade: the same color from its peak down to off
+        fade = max(2, round(random.uniform(*FIREWORKS_FADE) / FIREWORKS_STEP))
+        for i in range(1, fade):
+            step = shown(color, peak * (1 - i / fade) ** 1.5)
+            if step is None:
+                break  # faded out: the off step that follows takes over
+            yield Step(step, FIREWORKS_STEP)
 
 
 def _hue_color(hue: float, level: float) -> RGBColor:

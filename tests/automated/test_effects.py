@@ -57,36 +57,44 @@ def test_effect_steps_are_valid(effect: str) -> None:
             assert all(0 <= value <= 100 for value in color_values(step.color))
 
 
-def test_fireworks_bursts_are_spaced() -> None:
-    """Fireworks: off between shells, a dim launch, then a burst at least 0.9 s apart."""
+def test_fireworks_shells() -> None:
+    """Each shell: off 1-5 s, an orange trail ramping to 20% over 3-5 s,
+    a burst at 50% then 80-100% in a firework color, then a fade to off.
+    The light's brightness is ignored, and no step is all zero."""
     random.seed(1)
-    colors = (*effects.FIREWORKS_COLORS, effects.FIREWORKS_GOLD)
-    now, last_start, previous, starts, launches, offs = 0.0, None, 0, 0, 0, 0
-    for step in itertools.islice(effect_steps("fireworks", 255, None), 5000):
-        if step.color is None:  # off between shells, never a zero color
-            offs += 1
-            previous = 0
-            now += step.delay
-            continue
-        values = color_values(step.color)
-        assert max(values) > 0  # never all zero: that glows dim green
-        brightest = max(values)
-        if 0 < previous < 25 and 0 < brightest < 25:
-            launches += 1
-        if brightest > 50 and previous < 40:
-            if last_start is not None:
-                assert now - last_start >= 0.9 - 1e-9
-            last_start = now
-            starts += 1
-            assert any(
-                all(abs(v - c * brightest / 100) <= 1 for v, c in zip(values, color))
-                for color in colors
-            )
-        previous = brightest
-        now += step.delay
-    assert starts > 100
-    assert launches > starts
-    assert offs >= starts
+    steps = list(itertools.islice(effect_steps("fireworks", 3, None), 4000))
+    assert steps[0].color is None  # starts off
+    shells = 0
+    i = 0
+    while i < len(steps) - 80:
+        off = steps[i]
+        assert off.color is None and 1.0 <= off.delay <= 5.0
+        i += 1
+        # Trail: rises to 20% orange (the first steps may still be off)
+        trail = []
+        while steps[i].color is None or max(color_values(steps[i].color)) <= 20:
+            trail.append(steps[i])
+            i += 1
+        assert 3.0 - 1e-9 <= sum(s.delay for s in trail) <= 5.0 + 1e-9
+        assert color_values(trail[-1].color) == (20, 8, 0)
+        # Burst: 50%, then the peak, in a firework color
+        start, peak = color_values(steps[i].color), color_values(steps[i + 1].color)
+        assert max(start) == 50 and 80 <= max(peak) <= 100
+        assert any(
+            all(abs(v - c * max(peak) / 100) <= 1 for v, c in zip(peak, color))
+            for color in effects.FIREWORKS_COLORS
+        )
+        i += 2
+        # Fade: down to off over 1-3 s (including the peak step)
+        fade = [steps[i - 1]]
+        while steps[i].color is not None:
+            assert max(color_values(steps[i].color)) <= max(color_values(fade[-1].color))
+            fade.append(steps[i])
+            i += 1
+        assert 0.8 - 1e-9 <= sum(s.delay for s in fade) <= 3.0 + 1e-9
+        shells += 1
+    assert shells > 30
+    assert all(s.color is None or any(color_values(s.color)) for s in steps)
 
 
 def test_pursuit_alternates_slowly() -> None:
