@@ -101,11 +101,11 @@ Effects are chosen from the light card or with `light.turn_on`:
 
 | Effect | Description |
 |--------|-------------|
+| Breathe | The current color slowly brightens and dims |
 | Color Loop | Cycles through all colors, once a minute |
 | Random | A different color every 5 seconds |
 | Candle | Warm white with an irregular flicker |
 | Fireplace | Red and orange embers that flare and fade |
-| Breathe | The current color slowly brightens and dims |
 | Fireworks | The Lampster turns off; after 1 to 5 seconds a dim orange trail appears and slowly brightens from 5% to 20% over 3 to 5 seconds, then the shell bursts in red, orange, gold, green, blue, purple or white (50%, then at once 80 to 100%) and fades back to off over 1 to 3 seconds. Then the next shell. Ignores the light's brightness; follows the Effects speed |
 | Pursuit | Red and blue in turn, like police lights, each fading in and out over half a second. Slower than real police lights on purpose, so it stays under three flashes a second |
 
