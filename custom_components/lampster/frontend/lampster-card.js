@@ -431,30 +431,37 @@ function findDeep(el, selector, depth = 5) {
   return found;
 }
 
-// The corner radius of a feature's control: the first element inside it,
-// about the feature's size, with rounded corners
+// A corner radius as drawn: CSS limits it to half the shorter side, so a
+// theme's "pill" radius (such as 9999px) draws as a half circle
+const drawnRadius = (radius, w, h) => Math.max(0, Math.min(radius, w / 2, h / 2));
+
+// The corner radius of a feature's control, as drawn: the roundest element
+// inside it (through its shadow roots) that is about the feature's size
 function controlRadius(feature, b) {
-  const stack = [feature];
+  let found = 0;
+  let stack = [feature];
   for (let depth = 0; depth < 6 && stack.length; depth++) {
     const next = [];
     for (const el of stack) {
       for (const child of el.shadowRoot ? el.shadowRoot.querySelectorAll("*") : []) {
         const r = child.getBoundingClientRect();
-        const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius);
-        if (radius > 0 && Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) return radius;
+        if (Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) {
+          const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius) || 0;
+          found = Math.max(found, drawnRadius(radius, r.width, r.height));
+        }
         if (child.shadowRoot) next.push(child);
       }
     }
-    stack.splice(0, stack.length, ...next);
+    stack = next;
   }
-  return 12;
+  return found || drawnRadius(12, b.w, b.h);
 }
 
 /**
  * The slider in a channel: the unused part shows the channel's floor, and
  * the used part looks like a slatted roll-up door sliding along it, with no
- * handle. The bar keeps the slider's own corner curve, so the channel around
- * it stays concentric. This styles parts inside Home Assistant's slider; if
+ * handle. The slider's shape is not changed, and the channel around it is
+ * concentric with it. This styles parts inside Home Assistant's slider; if
  * an update renames them, the slider simply keeps its usual look.
  */
 let sliderSheet;
@@ -466,7 +473,6 @@ function styleSlider(slider, on) {
     sliderSheet.replaceSync(`
       :host([lampster-channel]) .slider .slider-track-background { opacity: 0; }
       :host([lampster-channel]) .slider .slider-track-bar {
-        border-radius: var(--control-slider-border-radius);
         background-image:
           repeating-linear-gradient(90deg,
             rgba(255,255,255,.28) 0, rgba(255,255,255,.08) 4px, rgba(0,0,0,.12) 8px,
@@ -705,7 +711,7 @@ class LampsterCard extends HTMLElement {
     this._frame.classList.toggle("styled", !look.theme);
     const pad = featuresStyle === "channel" ? 3 : 0;
     const areas = featuresStyle === "match" ? [] : controls.features.map((b) =>
-      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: Math.min(b.radius + pad, (b.h + 2 * pad) / 2) }));
+      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: drawnRadius(b.radius + pad, b.w + 2 * pad, b.h + 2 * pad) }));
     let texture = look.svg;
     if (areas.length && texture) {
       const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
@@ -734,7 +740,7 @@ class LampsterCard extends HTMLElement {
       const inset = compact ? 5 : 7;
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
-      const radius = parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12;
+      const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
       const avoid = [...controls.icon, ...controls.features];
       const clear = (x, y) => avoid.every((b) => {
         const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
