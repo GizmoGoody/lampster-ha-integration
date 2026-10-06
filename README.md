@@ -309,7 +309,7 @@ Connection dropped unexpectedly; reconnecting in 5 s
 
 If Home Assistant fails to connect to The Lampster 5 times in a row, a repair notice appears under **Settings** → **Repairs**. A separate notice explains when every Bluetooth connection slot that can reach The Lampster is in use. Both clear themselves once a connection succeeds.
 
-When the Lampster app is connected, The Lampster stops advertising, so Home Assistant sees it as unavailable (the same as when it is unplugged) rather than raising a notice.
+When The Lampster app is connected, The Lampster stops advertising, so Home Assistant sees it as unavailable (the same as when it is unplugged) rather than raising a notice.
 
 ### Enable Debug Logging
 
@@ -329,7 +329,7 @@ Then restart Home Assistant.
 
 ## Known Limitations
 
-1. **Single Connection**: The Lampster accepts one Bluetooth connection at a time, so the Lampster app and Home Assistant cannot be used together
+1. **Single Connection**: The Lampster accepts one Bluetooth connection at a time, so The Lampster app and Home Assistant cannot be used together
 2. **Touch Button While Off**: With the default settings, turning The Lampster on with the touch button is noticed at the next check (within the check interval). Enable *Maintain Bluetooth connection at all times* to make it instant
 3. **State Persistence**: Device remembers last color even when powered off
 4. **Range**: Bluetooth LE has limited range (~10m line of sight, less through walls)
