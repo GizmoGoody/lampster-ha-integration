@@ -70,13 +70,19 @@ def test_fireworks_shells() -> None:
         off = steps[i]
         assert off.color is None and 1.0 <= off.delay <= 5.0
         i += 1
-        # Trail: orange from 5% up to 20%, never the red that dimmer orange rounds to
+        # Trail: orange from 5% up to 20%, one channel by 1% at a time, with
+        # longer steps while dim
         trail = []
         while max(color_values(steps[i].color)) <= 20:
             red, green, blue = color_values(steps[i].color)
             assert red >= 5 and green >= 2 and blue == 0
+            if trail:
+                before = color_values(trail[-1].color)
+                assert sum(abs(a - b) for a, b in zip(before, (red, green, blue))) == 1
             trail.append(steps[i])
             i += 1
+        assert color_values(trail[0].color) == (5, 2, 0)
+        assert trail[0].delay > trail[-1].delay
         assert 3.0 - 1e-9 <= sum(s.delay for s in trail) <= 5.0 + 1e-9
         assert color_values(trail[-1].color) == (20, 8, 0)
         # Burst: 50%, then the peak, in a firework color

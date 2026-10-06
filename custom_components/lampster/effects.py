@@ -67,6 +67,8 @@ FIREWORKS_TRAIL_LEVEL = (5, 20)
 FIREWORKS_BURST_START = 50  # percent the burst starts at
 FIREWORKS_PEAK = (80, 100)  # percent the burst peaks at
 FIREWORKS_FADE = (1.0, 3.0)  # seconds the burst fades to off
+# Shortest time any trail step is shown (a Bluetooth write every ~0.1 s)
+FIREWORKS_TRAIL_MIN_STEP = 0.1
 # Pursuit: red and blue like police lights, but slow enough to be safe: each
 # color fades in, holds and fades out over half a second, so the color changes
 # twice a second (under the usual limit of three flashes in a second)
@@ -189,6 +191,31 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
         raise ValueError(f"Unknown effect: {effect}")
 
 
+def _fireworks_trail(duration: float) -> Iterator[Step]:
+    """The orange trail, as smooth as The Lampster's 1% steps allow.
+
+    Each step changes one channel by 1% (whichever keeps the color closest to
+    orange), and the steps are spaced evenly in perceived brightness: the eye
+    sees relative changes, so the dim start gets longer gaps than the end.
+    """
+    low, high = FIREWORKS_TRAIL_LEVEL
+    ratio = FIREWORKS_TRAIL[1] / FIREWORKS_TRAIL[0]
+    red, green = low, round(low * ratio)
+    end_green = round(high * ratio)
+    colors = [(red, green)]
+    while (red, green) != (high, end_green):
+        if green < end_green and (red == high or (green + 1) / red <= ratio):
+            green += 1
+        else:
+            red += 1
+        colors.append((red, green))
+    # Time each color in proportion to how dim it is (its share of 1/red)
+    weights = [1 / r for r, _ in colors]
+    scale = duration / sum(weights)
+    for (r, g), weight in zip(colors, weights):
+        yield Step(RGBColor(r, g, 0), max(FIREWORKS_TRAIL_MIN_STEP, weight * scale))
+
+
 def _fireworks() -> Iterator[Step]:
     """Shells that climb as an orange trail, burst in a color and fade to off."""
 
@@ -200,11 +227,7 @@ def _fireworks() -> Iterator[Step]:
     while True:
         yield Step(None, random.uniform(*FIREWORKS_OFF))
         # Trail: orange ramping up from dim to FIREWORKS_TRAIL_LEVEL
-        climb = max(2, round(random.uniform(*FIREWORKS_TRAIL_TIME) / FIREWORKS_STEP))
-        low, high = FIREWORKS_TRAIL_LEVEL
-        for i in range(climb):
-            level = low + (high - low) * i / (climb - 1)
-            yield Step(shown(FIREWORKS_TRAIL, level), FIREWORKS_STEP)
+        yield from _fireworks_trail(random.uniform(*FIREWORKS_TRAIL_TIME))
         # Burst: bright at once, then brighter still
         color = random.choice(FIREWORKS_COLORS)
         peak = random.uniform(*FIREWORKS_PEAK)
