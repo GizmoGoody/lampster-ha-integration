@@ -15,6 +15,7 @@ Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model
 - ✅ **Power Control** - Turn on/off
 - ✅ **Touch Button Sync** - Touch button changes show up instantly while The Lampster is on
 - ✅ **Diagnostics** - Signal strength, connect/command times, internal temperature, connection status and Bluetooth uplink
+- ✅ **Dashboard Card** - A tile card in polished aluminum, rusted steel or The Lampster's own Army, Artsy and Color finishes, with rivets or screws; included, with nothing else to install
 - ✅ **Local Control** - No cloud required
 
 ## Requirements
@@ -120,6 +121,46 @@ data:
   brightness_pct: 100
   transition: 600  # 10 minute wake-up
 ```
+
+### Dashboard card
+
+The integration includes a dashboard card, so there is nothing else to install. To add it, edit a dashboard, select **Add card**, and search for **The Lampster**.
+
+The card is Home Assistant's tile card in a finish of your choice. Every tile card option works the same way and appears in the same editor: name, state content, tap and hold actions, and features such as the brightness slider. Below them, the **The Lampster style** panel sets the finish:
+
+- **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color
+- **Randomize**: for Rusted Steel and the Army and Artsy styles, draws a new rust, wear or splatter pattern and keeps every other setting
+- **Fasteners**: Rivets, Phillips, Hex, Socket or None, in a color that matches the style or a custom color
+- **Fastener spacing**: Corners only, or fasteners all the way around at Half, Quarter, Eighth, Sixteenth, Thirty-second or Sixty-fourth spacing
+
+In place of the tile card's icon, the card shows The Lampster's head, with the light's current color in the lens.
+
+```yaml
+type: custom:lampster-card
+entity: light.the_lampster
+features:
+  - type: light-brightness
+# The Lampster style (all optional)
+style: rusted              # see the list below
+pattern: 4242              # the rust, wear or splatter pattern
+fasteners: rivets          # rivets, phillips, hex, socket or none
+fastener_color: match      # match or custom
+fastener_custom_color: [212, 175, 55]
+fastener_spacing: 4        # 0 (corners), 2, 4, 8, 16, 32 or 64
+paint_color: [31, 111, 120]  # for style: painted
+```
+
+| Option | Values | Default |
+|--------|--------|---------|
+| `style` | `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
+| `paint_color` | Red, green and blue, 0 to 255, for `painted` | `[31, 111, 120]` |
+| `pattern` | Any whole number; each number draws a different pattern | `17` |
+| `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
+| `fastener_color` | `match` (follows the style) or `custom` | `match` |
+| `fastener_custom_color` | Red, green and blue, 0 to 255, for `custom` | `[212, 175, 55]` |
+| `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64` | `4` |
+
+All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's **Show entity picture** option is always on, because the head is shown there.
 
 ### Via Automations
 
@@ -239,6 +280,10 @@ Found on the device page under **Diagnostic**. Signal strength, Connect time, Co
 3. Check Home Assistant logs: **Settings** → **System** → **Logs**
 4. Look for errors containing "lampster"
 
+### Dashboard card shows "Custom element does not exist"
+
+The integration loads the card on every dashboard by itself. If a dashboard was already open when Home Assistant started or the integration was updated, reload the page. In the Home Assistant Companion app, use **Reset frontend cache** in the app's settings.
+
 ### Device not discovered
 
 1. Ensure The Lampster advertises a Bluetooth name containing "Lamp" (it should be "Lampster")
@@ -342,6 +387,9 @@ Then restart Home Assistant.
 ```
 custom_components/lampster/
 ├── __init__.py          # Integration setup
+├── card.py             # Serves the dashboard card
+├── frontend/
+│   └── lampster-card.js # The dashboard card
 ├── manifest.json        # Integration metadata
 ├── const.py            # Constants
 ├── config_flow.py      # Discovery and config UI
