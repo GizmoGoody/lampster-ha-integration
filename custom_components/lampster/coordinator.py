@@ -476,6 +476,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
         if self._task_mode is not None:
+            if self._task_off and not state.is_on:
+                # The task's own off
+                return
             if self._task_off and state.is_on:
                 # The task had turned The Lampster off, so the touch button
                 # turned it on: stop the task and keep it on
@@ -679,10 +682,12 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                         # mode; writing now would switch it back on
                         return
                     if step.color is None:
-                        # Off for this step (all channels at zero would glow)
+                        # Off for this step (all channels at zero would glow).
+                        # Set first, so a report of this off is not taken for
+                        # the touch button
+                        self._task_off = True
                         if client.state.is_on:
                             await client.switch_off()
-                        self._task_off = True
                     else:
                         # Before the write: turning back on is not the button
                         self._task_off = False
