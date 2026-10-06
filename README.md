@@ -132,7 +132,7 @@ The card is Home Assistant's tile card in a finish of your choice. Every tile ca
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
 - **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a channel pressed into the panel (Channel), where a slider keeps its shape, the channel follows its curve, and its bar looks like a slatted roll-up door
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
-- **Fastener spacing**: Corners only, or fasteners all the way around at 1/2, 1/4, 1/8, 1/16, 1/32 or 1/64 spacing. The "+ ends" choices (and Ends) put one fastener at each end of a single-row card instead of in its corners. Fasteners that would touch the head or the features are left out
+- **Fastener spacing**: Corners only, or fasteners all the way around at 1/2, 1/4, 1/8, 1/16, 1/32 or 1/64 spacing. Fasteners that would touch the head or the features are left out. For one fastener at each end of a single-row card instead of in its corners, add an E to the spacing in YAML (see below)
 
 The color pickers list the theme colors (such as Teal or Amber). For any other color, type it into the picker as a CSS color, such as `#1f6f78`, `rgb(31, 111, 120)` or a color name like `goldenrod`, and select **Custom color**.
 
@@ -164,7 +164,7 @@ paint_color: teal          # for style: painted; a theme color or any CSS color
 | `pattern` | Any whole number; each number draws a different pattern | The default look |
 | `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
 | `fastener_color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
-| `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64`. Add `E` (such as `4E`, or `0E` for ends only) to put one fastener at each end of a single-row card instead of in its corners | `4` |
+| `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64`. YAML only: add `E` (such as `4E`, or `0E` for ends only) to put one fastener at each end of a single-row card instead of in its corners. The visual editor shows the spacing without the E and keeps the E when you change the spacing there | `4` |
 | `features_style` | `match` (the style itself), `flat` (the style's base color only) or `channel` (a channel pressed into the panel) | `match` |
 
 The editor writes every option the chosen style uses into the YAML, defaults included. All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's `icon` and `show_entity_picture` options have no effect, because the head is shown there.

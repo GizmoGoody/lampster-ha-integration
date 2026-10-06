@@ -64,10 +64,10 @@ const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"
 /**
  * Fastener spacing: the number is how many gaps each long edge is divided
  * into (0 is corners only). An E after it (such as 4E) puts one fastener at
- * each end of a single-row card instead of in its corners.
+ * each end of a single-row card instead of in its corners. The E is set in
+ * YAML only; the editor offers the fractions and keeps an E that is there.
  */
 const GAPS = [[0, "Corners"], [2, "1/2"], [4, "1/4"], [8, "1/8"], [16, "1/16"], [32, "1/32"], [64, "1/64"]];
-const SPACINGS = GAPS.flatMap(([n, label]) => [[n, label], [`${n}E`, n ? `${label} + ends` : "Ends"]]);
 function parseSpacing(value) {
   const m = String(value).trim().match(/^(\d+)\s*(E?)$/i);
   const gaps = m ? Number(m[1]) : NaN;
@@ -737,11 +737,12 @@ class LampsterCard extends HTMLElement {
     let markup = "";
     if (fasteners !== "none") {
       const compact = H < 80;  // a single row
-      const inset = compact ? 5 : 7;
+      // A channel takes room around the features: move the fasteners outward
+      const inset = (compact ? 5 : 7) - (featuresStyle === "channel" ? 1.5 : 0);
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
       const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
-      const avoid = [...controls.icon, ...controls.features];
+      const avoid = [...controls.icon, ...(areas.length ? areas : controls.features)];
       const clear = (x, y) => avoid.every((b) => {
         const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
         return Math.hypot(x - nx, y - ny) > size / 2 + (compact ? 0.5 : 1.5);
@@ -986,12 +987,12 @@ class LampsterCardEditor extends HTMLElement {
     fasteners.schema = c.fasteners === "none" ? [] : [
       {
         type: "grid", name: "", schema: [
-          { name: "fastener_spacing", selector: select(SPACINGS) },
+          { name: "fastener_spacing", selector: select(GAPS) },
           { name: "fastener_color", selector: { ui_color: { extra_options: [{ value: MATCH[0], label: MATCH[1] }] } } },
         ],
       },
     ];
-    const data = { ...c, collection: collection.id, fastener_spacing: String(c.fastener_spacing) };
+    const data = { ...c, collection: collection.id, fastener_spacing: String(parseSpacing(c.fastener_spacing).gaps) };
     for (const form of this._forms) form.data = data;
 
     // Every style but Brushed Aluminum has something to randomize
@@ -1015,7 +1016,10 @@ class LampsterCardEditor extends HTMLElement {
     const changes = {};
     for (const key of Object.keys(DEFAULTS)) {
       if (!(key in value)) continue;
-      const next = key === "fastener_spacing" ? parseSpacing(value[key])?.value : value[key];
+      // The spacing keeps an E set in the YAML (ends on single-row cards)
+      const next = key === "fastener_spacing"
+        ? parseSpacing(`${value[key]}${parseSpacing(c.fastener_spacing).ends ? "E" : ""}`)?.value
+        : value[key];
       if (JSON.stringify(next) !== JSON.stringify(c[key])) changes[key] = next;
     }
     if (Object.keys(changes).length) this._update(changes);
