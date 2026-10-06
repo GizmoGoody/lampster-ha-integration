@@ -309,7 +309,7 @@ async def test_touch_on_reads_actual_levels(
     lamp.touch_tap()  # off
     lamp.white = bytes([25, 5])  # changed without a report
     lamp.touch_tap()  # on
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.data.is_on
     assert coordinator.data.white_color == WhiteColor(25, 5)
 
