@@ -129,9 +129,12 @@ The integration includes a dashboard card, so there is nothing else to install. 
 The card is Home Assistant's tile card in a finish of your choice. Every tile card option works the same way and appears in the same editor: name, state content, tap and hold actions, and features such as the brightness slider. Below them, the **The Lampster style** panel sets the finish:
 
 - **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color
-- **Randomize**: for Rusted Steel and the Army and Artsy styles, draws a new rust, wear or splatter pattern and keeps every other setting
-- **Fasteners**: Rivets, Phillips, Hex, Socket or None, in a color that matches the style or a custom color
-- **Fastener spacing**: Corners only, or fasteners all the way around at Half, Quarter, Eighth, Sixteenth, Thirty-second or Sixty-fourth spacing
+- **Randomize**: for Polished Aluminum, Rusted Steel and the Army and Artsy styles, draws new reflections, rust, wear or splatter and keeps every other setting
+- **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
+- **Fastener spacing**: Corners only, or fasteners all the way around at Half, Quarter, Eighth, Sixteenth, Thirty-second or Sixty-fourth spacing. Fasteners along the edges that would touch the head or the controls are left out
+- **Keep the style plain behind the controls**: no rust, wear or splatter behind the slider and other controls
+
+The card's edge is drawn as a slightly raised panel. The tile card's Icon and Show entity picture options are left out of the editor, because the card shows the head there.
 
 In place of the tile card's icon, the card shows The Lampster's head, with the light's current color in the lens.
 
@@ -142,25 +145,25 @@ features:
   - type: light-brightness
 # The Lampster style (all optional)
 style: rusted              # see the list below
-pattern: 4242              # the rust, wear or splatter pattern
+pattern: 4242              # the reflections, rust, wear or splatter pattern
 fasteners: rivets          # rivets, phillips, hex, socket or none
-fastener_color: match      # match or custom
-fastener_custom_color: [212, 175, 55]
+fastener_color: match      # match, a theme color such as amber, or any CSS color
 fastener_spacing: 4        # 0 (corners), 2, 4, 8, 16, 32 or 64
-paint_color: [31, 111, 120]  # for style: painted
+clear_controls: false      # true keeps the style plain behind the controls
+paint_color: teal          # for style: painted; a theme color or any CSS color
 ```
 
 | Option | Values | Default |
 |--------|--------|---------|
 | `style` | `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
-| `paint_color` | Red, green and blue, 0 to 255, for `painted` | `[31, 111, 120]` |
-| `pattern` | Any whole number; each number draws a different pattern | `17` |
+| `paint_color` | For `painted`: a theme color such as `teal`, or any CSS color such as `"#1f6f78"` | `teal` |
+| `pattern` | Any whole number; each number draws a different pattern | The default look |
 | `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
-| `fastener_color` | `match` (follows the style) or `custom` | `match` |
-| `fastener_custom_color` | Red, green and blue, 0 to 255, for `custom` | `[212, 175, 55]` |
+| `fastener_color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
 | `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64` | `4` |
+| `clear_controls` | `true` keeps the style plain behind the slider and other controls | `false` |
 
-All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's **Show entity picture** option is always on, because the head is shown there.
+All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's `icon` and `show_entity_picture` options have no effect, because the head is shown there.
 
 ### Via Automations
 
