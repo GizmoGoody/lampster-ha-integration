@@ -21,6 +21,8 @@ from .constants import (
     CHAR_WHITE,
     DEVICE_NAME_PREFIX,
     MODE_BIT_POWER,
+    MODE_RGB_OFF,
+    MODE_WHITE_OFF,
     MODE_BIT_RGB,
     MODE_WRITE_ATTEMPTS,
     MODE_WRITE_RETRY_DELAY,
@@ -261,6 +263,22 @@ class LampsterClient:
             _LOGGER.info("Lamp powered off")
         except Exception as e:
             raise CommandError(f"Failed to power off: {e}") from e
+
+    async def switch_off(self):
+        """Turn the lamp off at once, keeping its mode (for effects).
+
+        Clears only the power bit, as the touch button does, without the
+        checks and fallback of power_off.
+
+        Raises:
+            ConnectionError: If not connected
+            CommandError: If command fails
+        """
+        if not self._client or not self._client.is_connected:
+            raise ConnectionError("Not connected to device")
+        await self._write_mode(MODE_RGB_OFF if self._state.mode == "rgb" else MODE_WHITE_OFF)
+        self._state.is_on = False
+        self._state.mode = "off"
 
     async def set_rgb_mode(self):
         """Switch to RGB mode.

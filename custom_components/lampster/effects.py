@@ -73,7 +73,7 @@ FIREWORKS_DARK = (0.5, 3.0)
 FIREWORKS_LULL_CHANCE = 0.2
 FIREWORKS_LULL = (3.0, 7.0)
 FIREWORKS_FINALE_CHANCE = 0.3
-FIREWORKS_FINALE_DARK = (0.2, 0.5)
+FIREWORKS_FINALE_DARK = (0.5, 0.8)
 # Pursuit: red and blue like police lights, but slow enough to be safe: each
 # color fades in, holds and fades out over half a second, so the color changes
 # twice a second (under the usual limit of three flashes in a second)
@@ -87,9 +87,13 @@ Color = RGBColor | WhiteColor
 
 @dataclass(frozen=True)
 class Step:
-    """One color to show, and for how long."""
+    """One color to show, and for how long.
 
-    color: Color
+    A color of None turns The Lampster off for the step: in color mode, all
+    channels at zero still leave a dim green glow.
+    """
+
+    color: Color | None
     delay: float
 
 
@@ -194,10 +198,12 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
 
 def _fireworks(level: float) -> Iterator[Step]:
     """Shells that launch as a dim rising trail, then burst and fade."""
-    dark = RGBColor(0, 0, 0)
+    dark = None  # off: all channels at zero would leave a dim green glow
 
-    def color_at(color: tuple[int, ...], share: float) -> RGBColor:
-        return RGBColor(*(_pct(c / 100 * level * share) for c in color))
+    def color_at(color: tuple[int, ...], share: float) -> RGBColor | None:
+        shown = RGBColor(*(_pct(c / 100 * level * share) for c in color))
+        # Too dim to show anything: off, since all zero glows dim green
+        return shown if any(shown.to_bytes()) else None
 
     while True:
         lull = random.random() < FIREWORKS_LULL_CHANCE

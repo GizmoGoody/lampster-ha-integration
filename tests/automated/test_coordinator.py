@@ -296,6 +296,58 @@ async def test_touch_hold_during_effect_stays_on(
     assert coordinator.data.mode == "white"
 
 
+async def test_effect_off_step_turns_lamp_off(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """An off step turns The Lampster off (keeping color mode); the next step turns it on."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_rgb_color", RGBColor(10, 0, 0))
+    seen: list[int] = []
+    original = coordinator._client.switch_off
+
+    async def record_off() -> None:
+        await original()
+        seen.append(lamp.mode)
+
+    coordinator._client.switch_off = record_off
+    steps = [
+        effects.Step(RGBColor(20, 0, 0), 0.01),
+        effects.Step(None, 0.01),
+        effects.Step(RGBColor(30, 0, 0), 0.01),
+    ]
+    coordinator._async_start_task("rgb", iter(steps), "test")
+    await coordinator._task
+    assert seen == [0x28]  # off, still in color mode
+    assert lamp.mode & 0x80  # back on for the last step
+    assert lamp.rgb == bytes([30, 0, 0])
+
+
+async def test_touch_on_while_effect_off_stops_it(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Turning The Lampster on by touch while an effect has it off stops the effect."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_rgb_color", RGBColor(10, 0, 0))
+
+    def steps():
+        yield effects.Step(RGBColor(20, 0, 0), 0.01)
+        while True:
+            yield effects.Step(None, 0.05)
+
+    coordinator.effect = "fireworks"
+    coordinator._async_start_task("rgb", steps(), "effect fireworks")
+    for _ in range(40):
+        if coordinator._task_off:
+            break
+        await asyncio.sleep(0.02)
+    assert coordinator._task_off
+    lamp.touch_tap()  # on again
+    await asyncio.sleep(0.2)
+    await hass.async_block_till_done()
+    assert coordinator.effect is None
+    assert lamp.mode & 0x80
+
+
 async def test_repair_issue_raised_and_cleared(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

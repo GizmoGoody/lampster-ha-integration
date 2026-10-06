@@ -150,6 +150,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The task has brought the lamp into its mode; from then on a report
         # of another mode means the touch button was used
         self._task_engaged = False
+        # The task turned The Lampster off for a step (for example between
+        # fireworks); turning it on now is the touch button
+        self._task_off = False
         self._versions_read = False
         self._consecutive_failures = 0
         self._last_error: str | None = None
@@ -473,6 +476,17 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
         if self._task_mode is not None:
+            if self._task_off and state.is_on:
+                # The task had turned The Lampster off, so the touch button
+                # turned it on: stop the task and keep it on
+                self._record(
+                    "The Lampster was turned on with the touch button; stopping "
+                    + (f"effect {self.effect}" if self.effect else "transition")
+                )
+                self._task_mode = None
+                self.hass.async_create_task(self._async_stop_task())
+                self._async_set_state(state, batch=True)
+                return
             if state.is_on and state.mode == self._task_mode:
                 # The effect's or transition's own writes; not recorded per step
                 self._task_engaged = True
@@ -617,6 +631,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     ) -> None:
         self._task_mode = mode
         self._task_engaged = False
+        self._task_off = False
         self._task = self.hass.async_create_background_task(
             self._async_run_steps(mode, steps, name, finish), f"lampster {name}"
         )
@@ -634,7 +649,11 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             await task
         except asyncio.CancelledError:
             pass
-        if was_effect:
+        if self._task_off and self._client is not None:
+            # Stopped while the task had The Lampster off: show it as off
+            self._task_off = False
+            self._async_set_state(self._client.state, batch=False)
+        elif was_effect:
             self.async_update_listeners()
 
     async def _async_run_steps(
@@ -651,13 +670,23 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             for step in steps:
                 async with self._lock:
                     client = await self._async_ensure_connected(name)
-                    if self._task_engaged and not (
-                        client.state.is_on and client.state.mode == mode
+                    if (
+                        self._task_engaged
+                        and not self._task_off
+                        and not (client.state.is_on and client.state.mode == mode)
                     ):
                         # The touch button turned The Lampster off or changed
                         # mode; writing now would switch it back on
                         return
-                    await getattr(client, write)(step.color)
+                    if step.color is None:
+                        # Off for this step (all channels at zero would glow)
+                        if client.state.is_on:
+                            await client.switch_off()
+                        self._task_off = True
+                    else:
+                        # Before the write: turning back on is not the button
+                        self._task_off = False
+                        await getattr(client, write)(step.color)
                     # The Lampster is now in the task's mode. It only reports
                     # mode changes, not our color writes, so this cannot be
                     # left to its reports (none come when it was already in
