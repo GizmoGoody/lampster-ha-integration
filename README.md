@@ -130,7 +130,7 @@ The card is Home Assistant's tile card in a finish of your choice. Every tile ca
 
 - **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color. Collection **None** keeps your theme's own tile card and adds only the head, in a **Head color** of your choice, and the fasteners
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
-- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a channel pressed into the panel (Channel), where a slider's bar looks like a slatted roll-up door sliding along the channel
+- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a channel pressed into the panel (Channel), where a slider keeps its shape, the channel follows its curve, and its bar looks like a slatted roll-up door
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
 - **Fastener spacing**: Corners only, or fasteners all the way around at 1/2, 1/4, 1/8, 1/16, 1/32 or 1/64 spacing. The "+ ends" choices (and Ends) put one fastener at each end of a single-row card instead of in its corners. Fasteners that would touch the head or the features are left out
 
