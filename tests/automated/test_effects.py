@@ -58,7 +58,7 @@ def test_effect_steps_are_valid(effect: str) -> None:
 
 
 def test_fireworks_shells() -> None:
-    """Each shell: off 1-5 s, an orange trail ramping to 20% over 3-5 s,
+    """Each shell: off 1-5 s, an orange trail ramping from 5% to 20% over 3-5 s,
     a burst at 50% then 80-100% in a firework color, then a fade to off.
     The light's brightness is ignored, and no step is all zero."""
     random.seed(1)
@@ -70,9 +70,11 @@ def test_fireworks_shells() -> None:
         off = steps[i]
         assert off.color is None and 1.0 <= off.delay <= 5.0
         i += 1
-        # Trail: rises to 20% orange (the first steps may still be off)
+        # Trail: orange from 5% up to 20%, never the red that dimmer orange rounds to
         trail = []
-        while steps[i].color is None or max(color_values(steps[i].color)) <= 20:
+        while max(color_values(steps[i].color)) <= 20:
+            red, green, blue = color_values(steps[i].color)
+            assert red >= 5 and green >= 2 and blue == 0
             trail.append(steps[i])
             i += 1
         assert 3.0 - 1e-9 <= sum(s.delay for s in trail) <= 5.0 + 1e-9

@@ -43,8 +43,8 @@ RANDOM_STEP = 5.0
 BREATHE_PERIOD = 5.0
 BREATHE_STEP = 0.2
 BREATHE_MIN = 0.1
-# Fireworks: the lamp is off; after 1-5 s an orange trail ramps up from off
-# to 20% over 3-5 s; the shell then bursts in a firework color (50%, then at
+# Fireworks: the lamp is off; after 1-5 s an orange trail appears at 5% and
+# ramps up to 20% over 3-5 s; the shell then bursts in a firework color (50%, then at
 # once its peak of 80-100%) and fades back to off over 1-3 s. Then the next
 # shell. It ignores the light's brightness. Bursts are at least 4 s apart (2 s
 # at 200% Effects speed), well under three flashes in a second.
@@ -61,7 +61,9 @@ FIREWORKS_TRAIL = (100, 40, 0)  # orange
 FIREWORKS_STEP = 0.1
 FIREWORKS_OFF = (1.0, 5.0)  # seconds off before each shell
 FIREWORKS_TRAIL_TIME = (3.0, 5.0)  # seconds the trail ramps up
-FIREWORKS_TRAIL_LEVEL = 20  # percent the trail ends at
+# Percent the trail starts and ends at. Each channel has 1% steps, so below
+# about 5% orange rounds to red (1% orange is red 1, green 0)
+FIREWORKS_TRAIL_LEVEL = (5, 20)
 FIREWORKS_BURST_START = 50  # percent the burst starts at
 FIREWORKS_PEAK = (80, 100)  # percent the burst peaks at
 FIREWORKS_FADE = (1.0, 3.0)  # seconds the burst fades to off
@@ -197,10 +199,12 @@ def _fireworks() -> Iterator[Step]:
 
     while True:
         yield Step(None, random.uniform(*FIREWORKS_OFF))
-        # Trail: orange ramping up from off to FIREWORKS_TRAIL_LEVEL
+        # Trail: orange ramping up from dim to FIREWORKS_TRAIL_LEVEL
         climb = max(2, round(random.uniform(*FIREWORKS_TRAIL_TIME) / FIREWORKS_STEP))
-        for i in range(1, climb + 1):
-            yield Step(shown(FIREWORKS_TRAIL, FIREWORKS_TRAIL_LEVEL * i / climb), FIREWORKS_STEP)
+        low, high = FIREWORKS_TRAIL_LEVEL
+        for i in range(climb):
+            level = low + (high - low) * i / (climb - 1)
+            yield Step(shown(FIREWORKS_TRAIL, level), FIREWORKS_STEP)
         # Burst: bright at once, then brighter still
         color = random.choice(FIREWORKS_COLORS)
         peak = random.uniform(*FIREWORKS_PEAK)
