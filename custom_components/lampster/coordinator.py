@@ -64,6 +64,13 @@ TOUCH_OFF_DELAY = 0.8
 FAILURES_BEFORE_ISSUE = 5
 ISSUE_CANNOT_CONNECT = "cannot_connect"
 ISSUE_NO_CONNECTION_SLOT = "no_connection_slot"
+# Raise a repair issue when The Lampster has been neither connected nor heard
+# by any Bluetooth adapter or proxy for this long. Home Assistant marks it
+# unavailable about 3 minutes after its last advertisement, so the notice
+# appears about 5 minutes after it was last heard. Its firmware can stop
+# responding until it is power-cycled.
+NOT_HEARD_ISSUE_AFTER = 120  # seconds
+ISSUE_NOT_HEARD = "not_heard"
 
 # Connection events kept for the diagnostics download
 EVENT_HISTORY = 50
@@ -154,6 +161,8 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._consecutive_failures = 0
         self._last_error: str | None = None
         self._events: deque[tuple[str, str]] = deque(maxlen=EVENT_HISTORY)
+        # When The Lampster was first found neither connected nor heard
+        self._not_heard_since: float | None = None
 
         # None until the first successful connection
         self.data: LampState | None = None
@@ -250,6 +259,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         lamp reappears, not for every repeated advertisement.
         """
         super()._async_handle_bluetooth_event(service_info, change)
+        self._async_heard()
         if not self.connected and not self._lock.locked():
             self.hass.async_create_background_task(
                 self._async_try_connect("advertisement received"),
@@ -257,7 +267,44 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             )
 
     async def _async_scheduled_check(self, _now: datetime) -> None:
+        self._async_check_not_heard()
         await self._async_try_connect("check interval")
+
+    @property
+    def heard(self) -> bool:
+        """Return True if a Bluetooth adapter or proxy currently hears the lamp.
+
+        The base class sets this from advertisements, and clears it when Home
+        Assistant marks the lamp unavailable.
+        """
+        return self._available
+
+    @callback
+    def _async_check_not_heard(self) -> None:
+        """Raise a repair issue if the lamp has been gone for a while."""
+        if self.connected or self.heard:
+            self._async_heard()
+            return
+        now = time.monotonic()
+        if self._not_heard_since is None:
+            self._not_heard_since = now
+            self._record("The Lampster is not connected and not heard by any Bluetooth adapter or proxy")
+        elif now - self._not_heard_since >= NOT_HEARD_ISSUE_AFTER:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                f"{ISSUE_NOT_HEARD}_{self._address}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=ISSUE_NOT_HEARD,
+            )
+
+    @callback
+    def _async_heard(self) -> None:
+        """The lamp was heard or connected: clear the not-heard repair issue."""
+        if self._not_heard_since is not None:
+            self._not_heard_since = None
+            ir.async_delete_issue(self.hass, DOMAIN, f"{ISSUE_NOT_HEARD}_{self._address}")
 
     async def _async_try_connect(self, reason: str) -> None:
         """Connect to read the lamp's state; stay connected if it should be.
@@ -694,7 +741,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._consecutive_failures += 1
         self._last_error = str(err) or type(err).__name__
         self._record(f"{what.capitalize()} failed: {self._last_error}")
-        if self._consecutive_failures >= FAILURES_BEFORE_ISSUE:
+        # While no adapter or proxy hears the lamp, the not-heard issue
+        # explains the failures; a "no connection slot" notice would mislead
+        if self._consecutive_failures >= FAILURES_BEFORE_ISSUE and self.heard:
             no_slot = "connection slot" in self._last_error.lower()
             ir.async_create_issue(
                 self.hass,
@@ -712,13 +761,14 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
 
     @callback
     def _async_connection_succeeded(self) -> None:
+        self._async_heard()
         if self._consecutive_failures >= FAILURES_BEFORE_ISSUE:
             self._async_delete_issues()
         self._consecutive_failures = 0
 
     @callback
     def _async_delete_issues(self) -> None:
-        for key in (ISSUE_CANNOT_CONNECT, ISSUE_NO_CONNECTION_SLOT):
+        for key in (ISSUE_CANNOT_CONNECT, ISSUE_NO_CONNECTION_SLOT, ISSUE_NOT_HEARD):
             ir.async_delete_issue(self.hass, DOMAIN, f"{key}_{self._address}")
 
     def diagnostics(self) -> dict[str, Any]:

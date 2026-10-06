@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncGenerator, Callable
 from datetime import timedelta
 from types import SimpleNamespace
@@ -19,6 +20,7 @@ from custom_components.lampster import effects
 from custom_components.lampster.const import DOMAIN
 from custom_components.lampster.coordinator import (
     FAILURES_BEFORE_ISSUE,
+    NOT_HEARD_ISSUE_AFTER,
     RECONNECT_DELAY,
     STATE_UPDATE_BATCH_DELAY,
     LampsterCoordinator,
@@ -294,6 +296,34 @@ async def test_touch_hold_during_effect_stays_on(
     assert lamp.mode & 0x80
     assert coordinator.effect is None
     assert coordinator.data.mode == "white"
+
+
+async def test_not_heard_repair_issue(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Not connected and not heard for a while: a repair issue; heard again: cleared.
+
+    Connection failures meanwhile do not raise the misleading slot notice.
+    """
+    coordinator = make_coordinator()
+    issue_id = f"not_heard_{ADDRESS}"
+    coordinator._available = False  # no adapter or proxy hears it
+    coordinator._async_check_not_heard()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None  # not yet
+
+    coordinator._not_heard_since = time.monotonic() - NOT_HEARD_ISSUE_AFTER
+    coordinator._async_check_not_heard()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+
+    for _ in range(FAILURES_BEFORE_ISSUE):
+        coordinator._async_connection_failed(
+            "connecting", TimeoutError("No backend with an available connection slot")
+        )
+    assert ir.async_get(hass).async_get_issue(DOMAIN, f"no_connection_slot_{ADDRESS}") is None
+
+    coordinator._available = True  # heard again
+    coordinator._async_check_not_heard()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_repair_issue_raised_and_cleared(

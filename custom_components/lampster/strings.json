@@ -100,6 +100,10 @@
     "no_connection_slot": {
       "title": "No free Bluetooth connection slot for The Lampster",
       "description": "Home Assistant failed to connect to The Lampster {attempts} times in a row because every connection slot on the Bluetooth adapters and proxies that can reach it is in use. The last error was: {error}\n\nFree a slot by disconnecting another Bluetooth device, turn off \"Maintain Bluetooth connection at all times\" for devices that do not need it, or add another Bluetooth proxy near The Lampster. This notice clears itself once a connection succeeds."
+    },
+    "not_heard": {
+      "title": "The Lampster cannot be found",
+      "description": "Home Assistant has not heard The Lampster for several minutes and is not connected to it. The Lampster stops sending Bluetooth signals while something else is connected to it, and it can also stop responding until it is power-cycled.\n\nTry these in order:\n1. Close the Lampster app on every phone and tablet, because it can hold the only connection.\n2. Unplug The Lampster for about 10 seconds, then plug it back in.\n3. Check that the Bluetooth adapter or proxy nearest The Lampster is powered on and connected to Home Assistant.\n4. If it still does not appear, connect to The Lampster once with the Lampster app, then close the app.\n\nThis notice clears itself as soon as Home Assistant hears The Lampster again."
     }
   }
 }
