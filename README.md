@@ -128,7 +128,7 @@ The integration includes a dashboard card, so there is nothing else to install. 
 
 The card is Home Assistant's tile card in a finish of your choice. Every tile card option works the same way and appears in the same editor: name, state content, tap and hold actions, and features such as the brightness slider. Below them, the **The Lampster style** panel sets the finish:
 
-- **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color
+- **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color. Collection **None** keeps your theme's own tile card and adds only the head, in a **Head color** of your choice, and the fasteners
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
 - **Controls style**: the slider and other controls sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a channel pressed into the panel (Inset)
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
@@ -149,6 +149,7 @@ features:
 style: rusted              # see the list below
 pattern: 4242              # the reflections, rust, wear, splatter or sheen pattern
 controls_style: match      # match, flat or inset
+head_color: light-grey     # for style: none; a theme color or any CSS color
 fasteners: rivets          # rivets, phillips, hex, socket or none
 fastener_color: match      # match, a theme color such as amber, or any CSS color
 fastener_spacing: 4        # 0 (corners), 2, 4, 8, 16, 32 or 64
@@ -157,8 +158,9 @@ paint_color: teal          # for style: painted; a theme color or any CSS color
 
 | Option | Values | Default |
 |--------|--------|---------|
-| `style` | `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
+| `style` | `none` (your theme's tile card), `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
 | `paint_color` | For `painted`: a theme color such as `teal`, or any CSS color such as `"#1f6f78"` | `teal` |
+| `head_color` | For `none`: the head's color, as a theme color or any CSS color | `light-grey` |
 | `pattern` | Any whole number; each number draws a different pattern | The default look |
 | `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
 | `fastener_color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
