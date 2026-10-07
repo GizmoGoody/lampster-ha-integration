@@ -130,7 +130,7 @@ The card is Home Assistant's tile card in a finish of your choice. Every tile ca
 
 - **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color. Collection **None** keeps your theme's own tile card and adds only the head, in a **Head color** of your choice, and the fasteners
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
-- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a channel pressed into the panel (Channel), where a slider keeps its shape, the channel follows its curve, and its bar looks like a slatted roll-up door
+- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or inset in a channel pressed into the panel (Inset). Inset, the brightness slider keeps its shape and its bar looks like a slatted roll-up door, the color favorites are keys that press in (the one matching the light stays pressed), and the toggle is a slide with a beveled tab. With Flat and Inset, the style still shows between the color favorites
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
 - **Fastener spacing**: Corners only, or fasteners all the way around at 1/2, 1/4, 1/8, 1/16, 1/32 or 1/64 spacing. Fasteners that would touch the head or the features are left out. For one fastener at each end of a single-row card instead of in its corners, add an E to the spacing in YAML (see below)
 
@@ -148,7 +148,7 @@ features:
 # The Lampster style (all optional)
 style: rusted              # see the list below
 pattern: 4242              # the reflections, rust, wear, splatter or sheen pattern
-features_style: match      # match, flat or channel
+features_style: match      # match, flat or inset
 head_color: light-grey     # for style: none; a theme color or any CSS color
 fasteners: rivets          # rivets, phillips, hex, socket or none
 fastener_color: match      # match, a theme color such as amber, or any CSS color
@@ -165,7 +165,7 @@ paint_color: teal          # for style: painted; a theme color or any CSS color
 | `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
 | `fastener_color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
 | `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64`. YAML only: add `E` (such as `4E`, or `0E` for ends only) to put one fastener at each end of a single-row card instead of in its corners. The visual editor shows the spacing without the E and keeps the E when you change the spacing there | `4` |
-| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `channel` (a channel pressed into the panel) | `match` |
+| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `inset` (inset in a channel pressed into the panel) | `match` |
 
 The editor writes every option the chosen style uses into the YAML, defaults included. All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's `icon` and `show_entity_picture` options have no effect, because the head is shown there.
 
