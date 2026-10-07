@@ -145,29 +145,30 @@ type: custom:lampster-card
 entity: light.the_lampster
 features:
   - type: light-brightness
-# The Lampster style (all optional)
+# The Lampster style
 style: rusted              # see the list below
 pattern: 4242              # the reflections, rust, wear, splatter or sheen pattern
 features_style: match      # match, flat or inset
-head_color: light-grey     # for style: none; a theme color or any CSS color
-fasteners: rivets          # rivets, phillips, hex, socket or none
-fastener_color: match      # match, a theme color such as amber, or any CSS color
-fastener_spacing: 4        # 0 (corners), 2, 4, 8, 16, 32 or 64; add E (such as 4E) for ends on a single row
-paint_color: teal          # for style: painted; a theme color or any CSS color
+fasteners:
+  type: rivets             # rivets, phillips, hex, socket or none
+  color: match             # match, a theme color such as amber, or any CSS color
+  spacing: 4               # 0 (corners), 2, 4, 8, 16, 32 or 64; add E (such as 4E) for ends on a single row
 ```
+
+For Painted and None, `paint_color` sets the color: the panel and the head for Painted, the head for None.
 
 | Option | Values | Default |
 |--------|--------|---------|
 | `style` | `none` (your theme's tile card), `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
-| `paint_color` | For `painted`: a theme color such as `teal`, or any CSS color such as `"#1f6f78"` | `teal` |
-| `head_color` | For `none`: the head's color, as a theme color or any CSS color | `light-grey` |
-| `pattern` | Any whole number; each number draws a different pattern | The default look |
-| `fasteners` | `rivets`, `phillips`, `hex`, `socket`, `none` | `rivets` |
-| `fastener_color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
-| `fastener_spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64`. YAML only: add `E` (such as `4E`, or `0E` for ends only) to put one fastener at each end of a single-row card instead of in its corners. The visual editor shows the spacing without the E and keeps the E when you change the spacing there | `4` |
-| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `inset` (inset in a channel pressed into the panel) | `match` |
+| `paint_color` | For `painted` (the panel and the head) and `none` (the head): a theme color such as `teal`, or any CSS color such as `"#1f6f78"` | `teal` for `painted`, `light-grey` for `none` |
+| `pattern` | For the styles with something to randomize (all but `brushed` and `none`): any whole number; each number draws a different pattern | The default look |
+| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `inset` (inset in a channel pressed into the panel); not used with `none` | `match` |
+| `fasteners` | A group of three options: | |
+| `  type` | `rivets`, `phillips`, `hex`, `socket` or `none` | `rivets` |
+| `  color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
+| `  spacing` | How many gaps each long edge is divided into: `0` (corners only), `2`, `4`, `8`, `16`, `32`, `64`. YAML only: add `E` (such as `4E`, or `0E` for ends only) to put one fastener at each end of a single-row card instead of in its corners. The visual editor shows the spacing without the E and keeps the E when you change the spacing there | `4` |
 
-The editor writes every option the chosen style uses into the YAML, defaults included. All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's `icon` and `show_entity_picture` options have no effect, because the head is shown there.
+The editor writes every option the chosen style uses into the YAML, defaults included, and removes the ones it does not use (for example `pattern` and `features_style` when you switch to None). All other options are the [tile card's](https://www.home-assistant.io/dashboards/tile/). The tile card's `icon` and `show_entity_picture` options have no effect, because the head is shown there.
 
 ### Via Automations
 

@@ -19,13 +19,13 @@
     ...["black", "blue", "gold", "green", "red", "white"].map((c) => `army_${c}`),
     ...["black", "gold", "green", "red", "white"].map((c) => `artsy_${c}`),
     ...["black", "blue", "gold", "green", "red"].map((c) => `color_${c}`)];
-  for (const style of styles) addCard(style, { style, features: brightness, fastener_spacing: 8, pattern: 4242 });
+  for (const style of styles) addCard(style, { style, features: brightness, fasteners: { spacing: 8 }, pattern: 4242 });
   // Fasteners and spacing, including ends (E) on single-row cards
-  for (const fasteners of ["rivets", "phillips", "hex", "socket", "none"]) {
-    addCard(`fasteners ${fasteners}`, { style: "polished", fasteners, fastener_spacing: 16, features: brightness });
+  for (const type of ["rivets", "phillips", "hex", "socket", "none"]) {
+    addCard(`fasteners ${type}`, { style: "polished", fasteners: { type, spacing: 16 }, features: brightness });
   }
   for (const spacing of [0, 2, 4, 8, 16, 32, 64, "0E", "8E"]) {
-    addCard(`single row, spacing ${spacing}`, { style: "rusted", fastener_spacing: spacing, features: brightness, features_position: "inline" }, { height: 56 });
+    addCard(`single row, spacing ${spacing}`, { style: "rusted", fasteners: { spacing }, features: brightness, features_position: "inline" }, { height: 56 });
   }
   // Features styles on single-row and two-row cards
   for (const features_style of ["match", "flat", "inset"]) {
@@ -33,8 +33,11 @@
     addCard(`two rows, ${features_style}`, { style: "artsy_white", features_style, features: brightness });
   }
   // Fastener colors: match, a theme color and a CSS color
-  for (const fastener_color of ["match", "amber", "#7a1f5c"]) {
-    addCard(`fastener color ${fastener_color}`, { style: "color_blue", fastener_color, features: brightness });
+  for (const color of ["match", "amber", "#7a1f5c"]) {
+    addCard(`fastener color ${color}`, { style: "color_blue", fasteners: { color }, features: brightness });
   }
+  // Painted and None use paint_color
+  addCard("painted, theme color", { style: "painted", paint_color: "teal", features: brightness });
+  addCard("none, head color", { style: "none", paint_color: "amber", features: brightness });
   runChecks();
 </script>

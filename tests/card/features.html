@@ -21,7 +21,7 @@
   const large = { features: all, features_position: "inline" };
   const size = { height: 230, width: 420 };
   for (const features_style of ["match", "flat", "inset"]) {
-    addCard(`all features, ${features_style}`, { style: "artsy_red", features_style, fastener_spacing: 32, ...large }, size);
+    addCard(`all features, ${features_style}`, { style: "artsy_red", features_style, fasteners: { spacing: 32 }, ...large }, size);
   }
   addCard("all features below, inset", { style: "polished", features_style: "inset", features: all }, { height: 320, width: 420 });
   addCard("pill theme, inset", { style: "polished", features_style: "inset", ...large }, { ...size, className: "pill" });
