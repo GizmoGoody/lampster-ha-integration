@@ -14,6 +14,13 @@ console.error = (...args) => {
   consoleError(...args);
 };
 
+// The card warns instead of failing when it cannot style a control; a test fails on it
+const consoleWarn = console.warn;
+console.warn = (...args) => {
+  problems.push(`console.warn: ${args.map((a) => (a instanceof Error ? `${a.message} ${a.stack}` : a)).join(" ")}`);
+  consoleWarn(...args);
+};
+
 const cards = [];
 
 /** Add a card to the page: a title, its configuration, and an optional size and CSS class. */
