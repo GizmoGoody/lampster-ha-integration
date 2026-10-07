@@ -43,3 +43,12 @@ jobs:
       - name: Report failures as annotations
         if: failure()
         run: python .github/scripts/annotate_failures.py junit.xml
+
+  card:
+    name: Dashboard card
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The card's test pages run in headless Chrome, which the runner includes
+      - name: Run the card test pages
+        run: python3 tests/card/run_card_tests.py

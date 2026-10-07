@@ -419,6 +419,14 @@ pip install pytest-homeassistant-custom-component
 pytest
 ```
 
+The dashboard card is tested by the pages in `tests/card/`, which load the card with stand-ins for the Home Assistant frontend and check how it draws (styles, fasteners, features styles, the editor). They run on GitHub for every push too; to run them locally with Chrome, Chromium or Edge:
+
+```bash
+python tests/card/run_card_tests.py
+```
+
+To look at the cards, open a page such as `tests/card/features.html` in the browser.
+
 The other scripts in `tests/` control a real lamp and are run by hand, for example `python tests/probe_button.py`.
 
 Manual checks in Home Assistant:
