@@ -804,11 +804,42 @@ class LampsterCard extends HTMLElement {
       }
       if (!parts.length) features.push(...[box(group)].filter(Boolean).map((b) => ({ ...b, radius: 12 })));
     }
+    // Watch for controls that appear later (a feature's code can load after
+    // the card has drawn)
+    this._watchAdded(root);
+    for (const group of groups) this._watchAdded(group.shadowRoot, 6);
     return { icon: find("ha-tile-icon, ha-tile-info"), features, sliders, swatches, switches };
   }
 
   /**
-   * After a draw, keep watching the layout for about a second: the tile card
+   * Redraw when elements are added inside a shadow root (and the shadow
+   * roots inside it, a few levels deep), such as a feature's control that
+   * renders after its code loads. Only additions count, not changes.
+   */
+  _watchAdded(root, depth = 0) {
+    if (!root) return;
+    this._observed ??= new WeakSet();
+    if (!this._observed.has(root)) {
+      this._observed.add(root);
+      this._mutations ??= new MutationObserver(() => this._scheduleDraw());
+      this._mutations.observe(root, { childList: true, subtree: true });
+    }
+    if (depth > 0) for (const el of root.querySelectorAll("*")) this._watchAdded(el.shadowRoot, depth - 1);
+  }
+
+  // A timer, not the next screen paint: paints stop when nothing on the page
+  // changes (and in background tabs), timers still run
+  _scheduleDraw() {
+    if (this._drawPending) return;
+    this._drawPending = true;
+    setTimeout(() => {
+      this._drawPending = false;
+      this._draw();
+    }, 0);
+  }
+
+  /**
+   * After a draw, keep checking the layout (every 50 ms) for about a second: the tile card
    * can move its features without changing size (fonts loading, the editor
    * preview's opening animation, features that render late).
    */
@@ -824,9 +855,9 @@ class LampsterCard extends HTMLElement {
       }
       const now = layoutSignature(this._controls());
       if (now !== this._signature) this._draw();
-      requestAnimationFrame(check);
+      setTimeout(check, 50);
     };
-    requestAnimationFrame(check);
+    setTimeout(check, 50);
   }
 
   _draw() {

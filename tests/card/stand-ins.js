@@ -102,9 +102,15 @@ const FEATURE_HTML = {
   "toggle": () => `<ha-control-switch></ha-control-switch>`,
 };
 // The feature's own element (such as hui-toggle-card-feature), holding its control
+// A page can set window.featureDelay to render the controls late, like a
+// feature whose code loads after the card has drawn
 customElements.define("hui-stand-in-card-feature", class extends StandIn {
   connectedCallback() {
-    this.shadowRoot.innerHTML = `<style>:host { display: block; } ${featureStyles}</style>${FEATURE_HTML[this.getAttribute("type")]()}`;
+    const render = () => {
+      this.shadowRoot.innerHTML = `<style>:host { display: block; } ${featureStyles}</style>${FEATURE_HTML[this.getAttribute("type")]()}`;
+    };
+    if (window.featureDelay) setTimeout(render, window.featureDelay);
+    else render();
   }
 });
 customElements.define("hui-card-feature", class extends StandIn {

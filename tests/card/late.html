@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Lampster card: controls that render late</title>
+<style>
+  body { margin: 0; padding: 16px; background: #120b19; color: #ddd; font: 13px Roboto, "Segoe UI", sans-serif; }
+  #cards { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+  figure { margin: 0; } figcaption { margin-bottom: 4px; color: #aaa; }
+  pre { white-space: pre-wrap; }
+</style>
+<script>
+  // The controls render 1.8 seconds after the card draws, like features
+  // whose code loads late; the card must still style them
+  window.featureDelay = 1800;
+</script>
+<script src="stand-ins.js"></script>
+<script src="../../custom_components/lampster/frontend/lampster-card.js"></script>
+<script src="checks.js"></script>
+<div id="cards"></div>
+<pre id="report" data-result="running">running</pre>
+<script>
+  const all = ["light-brightness", "light-color-temp", "light-color-favorites", "light-effect", "toggle"].map((type) => ({ type }));
+  addCard("late controls, inset", { style: "polished", features_style: "inset", features: all, features_position: "inline" }, { height: 230, width: 420 });
+  addCard("late controls, flat", { style: "artsy_red", features_style: "flat", features: all, features_position: "inline" }, { height: 230, width: 420 });
+  runChecks();
+</script>
