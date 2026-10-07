@@ -553,6 +553,12 @@ function styleControl(control, attribute, on) {
   control.toggleAttribute(attribute, on);
 }
 
+// The measured layout as text, to tell whether it moved: positions and
+// sizes only. (The controls themselves cannot be turned into text: Home
+// Assistant's controls hold data that refers back to itself.)
+const layoutSignature = (controls) =>
+  [...controls.icon, ...controls.features].map((b) => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.w)},${Math.round(b.h)},${Math.round(b.radius ?? 0)}`).join(";");
+
 // ---------------------------------------------------------------------------
 // The card
 // ---------------------------------------------------------------------------
@@ -813,7 +819,7 @@ class LampsterCard extends HTMLElement {
         this._settling = false;
         return;
       }
-      const now = JSON.stringify(this._controls());
+      const now = layoutSignature(this._controls());
       if (now !== this._signature) this._draw();
       requestAnimationFrame(check);
     };
@@ -830,7 +836,7 @@ class LampsterCard extends HTMLElement {
       : resolveColor(this._config.paint_color, this, "#1f6f78");
     const look = drawStyle(this._config, paint, p, W, H);
     const controls = this._controls();
-    this._settle(JSON.stringify(controls));
+    this._settle(layoutSignature(controls));
     const root = this.shadowRoot;
 
     // The features: on the style itself, on a flat patch of the style's base
@@ -854,11 +860,17 @@ class LampsterCard extends HTMLElement {
       `<div class="channel${b.slide ? " rail" : ""}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
     // Inset, the controls look physical: a slatted slider bar, color
     // favorites as keys, and the toggle as a slide
-    for (const slider of controls.sliders) styleSlider(slider, inset);
-    for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
-    for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
-    this._swatches = inset ? controls.swatches : [];
-    this._markPressed();
+    // These style parts inside Home Assistant's controls; if that ever
+    // fails, the controls keep their usual look and the card still draws
+    try {
+      for (const slider of controls.sliders) styleSlider(slider, inset);
+      for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
+      for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
+      this._swatches = inset ? controls.swatches : [];
+      this._markPressed();
+    } catch (err) {
+      console.warn("The Lampster card: could not style the controls", err);
+    }
     root.getElementById("bg").style.background = look.bg;
     root.getElementById("texture").innerHTML = `<defs>${textureFilters(p, this._config.pattern)}</defs>${texture}`;
     root.getElementById("gloss").style.background = look.gloss ? GLOSS : "none";
