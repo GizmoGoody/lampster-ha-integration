@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
-from .card import async_register_card
+from .card import async_register_card, async_remove_card_resource
 from .const import (
     CONF_ALWAYS_CONNECTED,
     CONF_OFF_DISCONNECT_DELAY,
@@ -96,3 +96,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_stop()
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove the card from the dashboard resources with the last The Lampster."""
+    others = [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]
+    if not others:
+        await async_remove_card_resource(hass)

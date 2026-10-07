@@ -124,7 +124,7 @@ data:
 
 ### Dashboard card
 
-The integration includes a dashboard card, so there is nothing else to install. To add it, edit a dashboard, select **Add card**, and search for **The Lampster**.
+The integration includes a dashboard card, so there is nothing else to install: it adds the card to **Settings** → **Dashboards** → **Resources** by itself, keeps it up to date, and removes it when the last The Lampster is removed. To add the card, edit a dashboard, select **Add card**, and search for **The Lampster**.
 
 The card is Home Assistant's tile card in a finish of your choice. Every tile card option works the same way and appears in the same editor: name, state content, tap and hold actions, and features such as the brightness slider. Below them, the **The Lampster style** panel sets the finish:
 
@@ -290,7 +290,16 @@ Found on the device page under **Diagnostic**. Signal strength, Connect time, Co
 
 ### Dashboard card shows "Custom element does not exist"
 
-The integration loads the card on every dashboard by itself. If a dashboard was already open when Home Assistant started or the integration was updated, reload the page. In the Home Assistant Companion app, use **Reset frontend cache** in the app's settings.
+The integration adds the card to the dashboard resources, which a dashboard reads from Home Assistant every time it opens. If a dashboard was opened while Home Assistant was still starting, the card may be missing until the page is reloaded once (in the Companion app, pull down to refresh).
+
+If your dashboard resources are defined in YAML (`lovelace:` `resource_mode: yaml`), the integration cannot add the resource and loads the card on every page instead. A browser can then show a stored copy of a page from before the card was available; reload the page once, or add the resource to your YAML yourself:
+
+```yaml
+lovelace:
+  resources:
+    - url: /lampster/lampster-card.js
+      type: module
+```
 
 ### Device not discovered
 
