@@ -458,7 +458,7 @@ function controlRadius(feature, b) {
 }
 
 /**
- * The slider in a channel: the unused part shows the channel's floor, and
+ * A slider in a channel: the unused part shows the channel's floor, and
  * the used part looks like a slatted roll-up door sliding along it, with no
  * handle. The slider's shape is not changed, and the channel around it is
  * concentric with it. This styles parts inside Home Assistant's slider; if
@@ -484,7 +484,11 @@ function styleSlider(slider, on) {
     `);
   }
   if (!root.adoptedStyleSheets.includes(sliderSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sliderSheet];
-  slider.toggleAttribute("lampster-channel", on);
+  // Only sliders whose unused part is a dim copy of the bar (such as
+  // brightness); a slider showing a scale (such as color temperature's
+  // gradient) keeps its look inside the channel
+  const opacity = parseFloat(getComputedStyle(slider).getPropertyValue("--control-slider-background-opacity"));
+  slider.toggleAttribute("lampster-channel", on && !(opacity >= 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -665,32 +669,65 @@ class LampsterCard extends HTMLElement {
   _controls() {
     const root = this._tile?.shadowRoot;
     if (!root) return { icon: [], features: [], sliders: [] };
+    // Positions in the card's own pixels, even while the card is scaled
+    // (the card editor's preview opens with a zoom animation)
     const origin = this._frame.getBoundingClientRect();
+    const scale = origin.width / this._frame.offsetWidth || 1;
     const box = (el) => {
       const r = el.getBoundingClientRect();
-      return r.width && r.height ? { x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height } : null;
+      return r.width && r.height
+        ? { x: (r.left - origin.left) / scale, y: (r.top - origin.top) / scale, w: r.width / scale, h: r.height / scale }
+        : null;
     };
     const find = (selector) => [...root.querySelectorAll(selector)].map(box).filter(Boolean);
-    const features = root.querySelector("hui-card-features");
-    if (features && this._watched !== features) {
-      this._watched = features;
-      this._resize.observe(features);
+    // The tile card has up to two groups of features: one beside the name
+    // (inline) and one below it
+    const groups = [...root.querySelectorAll("hui-card-features")];
+    this._watched ??= new WeakSet();
+    for (const group of groups) {
+      if (this._watched.has(group)) continue;
+      this._watched.add(group);
+      this._resize.observe(group);
     }
-    // Each feature, or all of them together if they cannot be told apart.
+    // Each feature; a group whose features cannot be told apart counts as one.
     // A feature's corner radius is its control's (such as the slider's), so
     // a channel around it can follow the same curve.
-    const parts = [...(features?.shadowRoot?.querySelectorAll("hui-card-feature") ?? [])];
-    const each = parts.map((el) => {
-      const b = box(el);
-      if (b) b.radius = controlRadius(el, b);
-      return b;
-    }).filter(Boolean);
-    const sliders = parts.flatMap((el) => findDeep(el, "ha-control-slider"));
-    return {
-      icon: find("ha-tile-icon, ha-tile-info"),
-      features: each.length ? each : find("hui-card-features").map((b) => ({ ...b, radius: 12 })),
-      sliders,
+    const features = [];
+    const sliders = [];
+    for (const group of groups) {
+      const parts = [...(group.shadowRoot?.querySelectorAll("hui-card-feature") ?? [])];
+      const each = parts.map((el) => {
+        const b = box(el);
+        if (b) b.radius = controlRadius(el, b) / scale;
+        return b;
+      }).filter(Boolean);
+      if (each.length) features.push(...each);
+      else features.push(...[box(group)].filter(Boolean).map((b) => ({ ...b, radius: 12 })));
+      sliders.push(...parts.flatMap((el) => findDeep(el, "ha-control-slider")));
+    }
+    return { icon: find("ha-tile-icon, ha-tile-info"), features, sliders };
+  }
+
+  /**
+   * After a draw, keep watching the layout for about a second: the tile card
+   * can move its features without changing size (fonts loading, the editor
+   * preview's opening animation, features that render late).
+   */
+  _settle(signature) {
+    this._signature = signature;
+    this._settleUntil = performance.now() + 1200;
+    if (this._settling) return;
+    this._settling = true;
+    const check = () => {
+      if (performance.now() > this._settleUntil || !this.isConnected) {
+        this._settling = false;
+        return;
+      }
+      const now = JSON.stringify(this._controls());
+      if (now !== this._signature) this._draw();
+      requestAnimationFrame(check);
     };
+    requestAnimationFrame(check);
   }
 
   _draw() {
@@ -703,6 +740,7 @@ class LampsterCard extends HTMLElement {
       : resolveColor(this._config.paint_color, this, "#1f6f78");
     const look = drawStyle(this._config, paint, p, W, H);
     const controls = this._controls();
+    this._settle(JSON.stringify(controls));
     const root = this.shadowRoot;
 
     // The features: on the style itself, on a flat patch of the style's base
