@@ -756,10 +756,13 @@ class LampsterCard extends HTMLElement {
         points
           .filter(([x, y], i, all) => {
             if (i < fixed) return true;
-            // After the fixed ones, fasteners come in mirrored pairs (top and
-            // bottom, or left and right ends); keep a pair only if both are clear
+            // After the fixed ones, fasteners come in mirrored pairs. The top
+            // and bottom rows always stay, so they always match; a pair on the
+            // left and right ends is left out only if one would touch the
+            // head or a feature
             const mate = all[fixed + ((i - fixed) ^ 1)];
-            return clear(x, y) && (!mate || clear(mate[0], mate[1]));
+            if (!mate || Math.abs(mate[0] - x) < 0.5) return true;
+            return clear(x, y) && clear(mate[0], mate[1]);
           })
           .map(([x, y], i) =>
             `<use href="#${p}${fasteners}" color="${color}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"` +
