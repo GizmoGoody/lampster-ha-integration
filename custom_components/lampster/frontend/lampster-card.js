@@ -743,7 +743,9 @@ class LampsterCard extends HTMLElement {
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
       const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
-      const avoid = [...controls.icon, ...(areas.length ? areas : controls.features)];
+      // Clear of the head and the features themselves; with the fasteners
+      // moved outward, they fit in the gap beside a channel
+      const avoid = [...controls.icon, ...controls.features];
       const clear = (x, y) => avoid.every((b) => {
         const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
         return Math.hypot(x - nx, y - ny) > size / 2 + (compact ? 0.5 : 1.5);
