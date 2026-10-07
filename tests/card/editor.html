@@ -73,12 +73,6 @@
     now = events.at(-1);
     check(now.style === "brushed" && !("paint_color" in now) && !("pattern" in now), `Brushed Aluminum drops paint_color and pattern (${Object.keys(now).join(", ")})`);
 
-    // Options of earlier versions are removed
-    events.length = 0;
-    editor.setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", style: "none", head_color: "red", fastener_color: "red", fastener_spacing: 32, controls_style: "inset" });
-    now = events.at(-1) ?? {};
-    check(!["head_color", "fastener_color", "fastener_spacing", "controls_style"].some((k) => k in now), `options of earlier versions are removed (${Object.keys(now).join(", ")})`);
-
     // Invalid settings show a clear error on the card
     for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fasteners: { spacing: 3 } }, "spacing"],
       [{ fasteners: { type: "nails" } }, "type"], [{ fasteners: "rivets" }, "group"], [{ features_style: "channel" }, "features_style"]]) {

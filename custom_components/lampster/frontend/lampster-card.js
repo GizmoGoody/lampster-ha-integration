@@ -85,9 +85,6 @@ const FASTENER_DEFAULTS = { type: "rivets", color: "match", spacing: 4 };
 const DEFAULT_PATTERN = 17;
 // The card's own options; everything else belongs to the tile card
 const OWN_KEYS = ["style", "paint_color", "pattern", "features_style", "fasteners"];
-// Options of earlier versions of the card: never passed on to the tile card
-// (its editor would refuse them), and removed by the editor
-const RETIRED_KEYS = ["head_color", "fastener_color", "fastener_spacing", "single_row_fasteners", "controls_style", "clear_controls"];
 const usesPaint = (style) => style === "painted" || style === "none";
 
 function validate(config) {
@@ -118,7 +115,7 @@ function validate(config) {
 // The tile card's part of the configuration
 function tileConfig(config) {
   const tile = { ...config, type: "tile", show_entity_picture: true };
-  for (const key of [...OWN_KEYS, ...RETIRED_KEYS]) delete tile[key];
+  for (const key of OWN_KEYS) delete tile[key];
   return tile;
 }
 
@@ -1236,12 +1233,10 @@ class LampsterCardEditor extends HTMLElement {
  * - paint_color only for Painted and None,
  * - pattern only for styles with something to randomize,
  * - features_style for every style but None,
- * - fasteners color and spacing unless the type is none,
- * - options of earlier versions of the card.
+ * - fasteners color and spacing unless the type is none.
  */
 function explicit(config) {
   const c = { ...config };
-  for (const key of RETIRED_KEYS) delete c[key];
   const style = STYLES[c.style] ? c.style : DEFAULTS.style;
   c.style = style;
   if (usesPaint(style)) c.paint_color ??= DEFAULT_PAINT[style];
