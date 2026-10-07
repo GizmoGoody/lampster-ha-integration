@@ -792,7 +792,10 @@ class LampsterCard extends HTMLElement {
         const keys = findDeep(el, "ha-favorite-color-button");
         swatches.push(...keys);
         const slide = findDeep(el, "ha-control-switch").length > 0;
-        for (const area of keys.length ? keys : [el]) {
+        // The feature itself, not its wrapper: a feature next to a divider
+        // line is padded to make room for the line
+        const inner = [...(el.shadowRoot?.children ?? [])].find((child) => child.tagName !== "STYLE") ?? el;
+        for (const area of keys.length ? keys : [inner]) {
           const b = box(area);
           if (b) features.push({ ...b, radius: controlRadius(area, scale), slide });
         }
