@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Lampster card: color temperature while dragging</title>
+<style>
+  body { margin: 0; padding: 16px; background: #120b19; color: #ddd; font: 13px Roboto, "Segoe UI", sans-serif; }
+  pre { white-space: pre-wrap; }
+</style>
+<script src="stand-ins.js"></script>
+<script src="../../custom_components/lampster/frontend/lampster-card.js"></script>
+<div id="cards" style="width: 420px; height: 230px"></div>
+<pre id="report" data-result="running">running</pre>
+<script>
+  // While the color temperature slider is dragged, The Lampster follows it in
+  // 100 K steps, at most every 200 ms, with the last step always sent; letting
+  // go is left to Home Assistant's own slider
+  const problems = [], passed = [];
+  window.addEventListener("error", (ev) => problems.push(`Page error: ${ev.message}`));
+  const check = (ok, message) => (ok ? passed : problems).push(message);
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const find = (el, sel) => { const r = el.shadowRoot; if (!r) return []; return [...r.querySelectorAll(sel), ...[...r.querySelectorAll("*")].flatMap((x) => find(x, sel))]; };
+
+  (async () => {
+    const hass = makeHass();
+    const card = document.createElement("lampster-card");
+    card.setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", style: "polished", features_style: "match",
+      features: [{ type: "light-brightness" }, { type: "light-color-temp" }] });
+    card.hass = hass;
+    document.getElementById("cards").append(card);
+    await wait(500);
+    const [temp] = find(card, 'ha-control-slider[mode="cursor"]');
+    const [brightness] = find(card, "ha-control-slider:not([mode])");
+    const move = (slider, value) => slider.dispatchEvent(new CustomEvent("slider-moved", { detail: { value }, bubbles: true, composed: true }));
+    const kelvins = () => hass.calls.filter((c) => c.service === "turn_on").map((c) => c.data.color_temp_kelvin);
+
+    check(Boolean(temp), "the color temperature slider is found");
+    check(temp?.step === 100, `the slider moves in 100 K steps (${temp?.step})`);
+
+    // A quick drag: 3000, 3100, 3200 at once, then 3300 and 3400 a little later
+    move(temp, 3000); move(temp, 3100); move(temp, 3200);
+    await wait(50);
+    move(temp, 3300);
+    await wait(50);
+    move(temp, 3400);
+    await wait(400);
+    const sent = kelvins();
+    check(sent.length >= 2 && sent.length <= 3, `a few updates while dragging, not one per step (${sent.join(", ")})`);
+    check(sent.every((k) => k % 100 === 0), "every update is a 100 K step");
+    check(sent.at(-1) === 3400, `the last step is sent (${sent.at(-1)})`);
+    check(hass.calls.every((c) => c.data.entity_id === "light.the_lampster"), "the updates go to the card's light");
+
+    // Letting go: nothing more from the card (Home Assistant's slider sends the final value)
+    move(temp, 3500);
+    move(temp, undefined);
+    await wait(400);
+    check(kelvins().length === sent.length, `nothing is sent after letting go (${kelvins().join(", ")})`);
+
+    // Other sliders are not followed
+    hass.calls.length = 0;
+    move(brightness, 50);
+    await wait(300);
+    check(hass.calls.length === 0, "dragging the brightness slider sends nothing from the card");
+
+    const report = document.getElementById("report");
+    report.dataset.result = problems.length ? "fail" : "pass";
+    report.textContent = [...problems.map((p) => `FAIL ${p}`), ...passed.map((p) => `ok   ${p}`)].join("\n");
+  })().catch((err) => {
+    const report = document.getElementById("report");
+    report.dataset.result = "fail";
+    report.textContent = `FAIL ${err.stack || err}`;
+  });
+</script>

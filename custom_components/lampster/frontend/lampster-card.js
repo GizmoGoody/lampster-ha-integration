@@ -479,7 +479,7 @@ const rgbOf = (css) => (css.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
 /**
  * A slider in a channel: the unused part shows the channel's floor, and
  * the used part looks like a slatted roll-up door sliding along it, with no
- * handle. The color temperature slider's marker becomes a round loupe in a
+ * handle; its end is a raised ridge. The color temperature slider's marker becomes a round loupe in a
  * beveled bezel of the card's material (bezel), filled with only the color
  * it is on: the slider's own gradient, magnified so far that one color
  * fills the glass, so it follows the marker while it is dragged. The
@@ -507,13 +507,18 @@ function styleSlider(slider, on, bezel) {
           linear-gradient(180deg, rgba(255,255,255,.3), rgba(255,255,255,0) 40%, rgba(0,0,0,.3));
         box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.35);
       }
-      :host([lampster-channel]) .slider .slider-track-bar::after { display: none; }
+      :host([lampster-channel]) .slider .slider-track-bar::after {
+        top: 0; bottom: 0; right: 0; margin: 0; width: 5px; height: auto;
+        border-top-right-radius: inherit; border-bottom-right-radius: inherit;
+        background: linear-gradient(90deg, rgba(255,255,255,.35) 0, rgba(0,0,0,.55) 1px, rgba(0,0,0,.75) 55%, rgba(0,0,0,.6));
+        box-shadow: -1px 0 0 rgba(255,255,255,.3), 1px 0 2px rgba(0,0,0,.55);
+      }
       :host([lampster-loupe]) .slider .slider-track-cursor {
         --cursor-size: calc(var(--control-slider-thickness) - 4px);
         top: 50%; bottom: auto; margin-top: calc(var(--cursor-size) / -2);
         width: var(--cursor-size); height: var(--cursor-size); border-radius: 50%;
         background: var(--lampster-bezel, #c3c8cc);
-        box-shadow: 0 2px 4px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.45);
+        box-shadow: 0 0 3px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.35);
       }
       :host([lampster-loupe]) .slider .slider-track-cursor::after {
         inset: 4px; width: auto; height: auto; margin: 0; border-radius: 50%;
@@ -524,7 +529,7 @@ function styleSlider(slider, on, bezel) {
         background-size: 100% 100%, 100% 100%, 100000% 100%;
         background-position: 0 0, 0 0, calc(var(--value, 0) * 100%) 50%;
         background-repeat: no-repeat;
-        box-shadow: inset 0 2px 3px rgba(0,0,0,.55), inset 0 -1px 1px rgba(255,255,255,.4);
+        box-shadow: inset 0 0 3px rgba(0,0,0,.5);
       }
     `);
   }
@@ -726,6 +731,38 @@ class LampsterCard extends HTMLElement {
     this._hass = hass;
     if (this._tile) this._tile.hass = this._innerHass(hass);
     this._markPressed();
+  }
+
+  /**
+   * The color temperature slider tells the light only when it is let go;
+   * this sends each new 100 K step while it is dragged too, at most every
+   * 200 ms (the last step is always sent), so The Lampster follows along.
+   */
+  _followWhileDragged(slider) {
+    if (slider.getRootNode()?.host?.localName !== "hui-light-color-temp-card-feature") return;
+    this._following ??= new WeakSet();
+    if (this._following.has(slider)) return;
+    this._following.add(slider);
+    let sent, pending, timer, last = 0;
+    const send = () => {
+      timer = undefined;
+      if (pending === undefined || pending === sent) return;
+      sent = pending;
+      last = Date.now();
+      this._hass?.callService("light", "turn_on", { entity_id: this._config.entity, color_temp_kelvin: sent });
+    };
+    slider.addEventListener("slider-moved", (ev) => {
+      const value = ev.detail?.value;
+      if (value === undefined) {
+        // Let go: Home Assistant's own slider sends the final value
+        clearTimeout(timer);
+        timer = undefined;
+        pending = sent = undefined;
+        return;
+      }
+      pending = value;
+      if (timer === undefined) timer = setTimeout(send, Math.max(0, 200 - (Date.now() - last)));
+    });
   }
 
   // Inset: the color favorite matching the light's current color stays pressed
@@ -946,7 +983,10 @@ class LampsterCard extends HTMLElement {
     // These style parts inside Home Assistant's controls; if that ever
     // fails, the controls keep their usual look and the card still draws
     try {
-      for (const slider of controls.sliders) styleSlider(slider, inset, bezelOf(look.metal));
+      for (const slider of controls.sliders) {
+        styleSlider(slider, inset, bezelOf(look.metal));
+        this._followWhileDragged(slider);
+      }
       for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
       for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
       this._swatches = inset ? controls.swatches : [];
