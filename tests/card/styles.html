@@ -36,8 +36,10 @@
   for (const color of ["match", "amber", "#7a1f5c"]) {
     addCard(`fastener color ${color}`, { style: "color_blue", fasteners: { color }, features: brightness });
   }
-  // Painted and None use paint_color
+  // Painted's paint, and head colors on any style (None needs one)
   addCard("painted, theme color", { style: "painted", paint_color: "teal", features: brightness });
-  addCard("none, head color", { style: "none", paint_color: "amber", features: brightness });
-  runChecks();
+  addCard("painted, own head color", { style: "painted", paint_color: "teal", head_color: "#7a1f5c", features: brightness });
+  addCard("rusted, own head color", { style: "rusted", head_color: "#d4af37", features: brightness });
+  addCard("none, head color", { style: "none", head_color: "#ff8800", features: brightness });
+  runChecks({ head: { "painted, own head color": "#7a1f5c", "rusted, own head color": "#d4af37", "none, head color": "#ff8800" } });
 </script>

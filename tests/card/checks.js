@@ -62,6 +62,8 @@ window.runChecks = (expectations = {}) => {
       // The head replaces the tile card's icon
       const img = tile?.shadowRoot.querySelector("ha-tile-icon img");
       check(title, img?.src.startsWith("data:image/svg+xml"), "the head is shown in place of the icon");
+      const head = expectations.head?.[title];
+      if (head) check(title, decodeURIComponent(img?.src ?? "").includes(`stop-color="${head}"`), `the head is ${head}`);
 
       // Fasteners: drawn, all on the card, and the top and bottom rows match
       const uses = [...root.querySelectorAll("#fasteners use")].map((u) => {

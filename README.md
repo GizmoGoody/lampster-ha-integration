@@ -129,6 +129,7 @@ The integration includes a dashboard card, so there is nothing else to install: 
 The card is Home Assistant's tile card in a finish of your choice. Every tile card option works the same way and appears in the same editor: name, state content, tap and hold actions, and features such as the brightness slider. Below them, the **The Lampster style** panel sets the finish:
 
 - **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color. Collection **None** keeps your theme's own tile card and adds only the head, in a **Head color** of your choice, and the fasteners
+- **Head color**: the head takes the style's color (Match style), or any color you choose, with every style
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
 - **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or inset in a channel pressed into the panel (Inset). Inset, the brightness slider keeps its shape and its bar looks like a slatted roll-up door, the color favorites are keys that press in (the one matching the light stays pressed), and the toggle is a slide with a beveled tab. With Flat and Inset, the style still shows between the color favorites
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
@@ -147,6 +148,7 @@ features:
   - type: light-brightness
 # The Lampster style
 style: rusted              # see the list below
+head_color: match          # match (the style's color), a theme color such as amber, or any CSS color
 pattern: 4242              # the reflections, rust, wear, splatter or sheen pattern
 features_style: match      # match, flat or inset
 fasteners:
@@ -155,12 +157,13 @@ fasteners:
   spacing: 4               # 0 (corners), 2, 4, 8, 16, 32 or 64; add E (such as 4E) for ends on a single row
 ```
 
-For Painted and None, `paint_color` sets the color: the panel and the head for Painted, the head for None.
+For Painted, `paint_color` sets the paint of the panel (and of the head, unless `head_color` gives it a color of its own). With None, `head_color` must be a color, because there is no style color to match.
 
 | Option | Values | Default |
 |--------|--------|---------|
 | `style` | `none` (your theme's tile card), `polished`, `brushed`, `rusted`, `painted`, `army_black`, `army_blue`, `army_gold`, `army_green`, `army_red`, `army_white`, `artsy_black`, `artsy_gold`, `artsy_green`, `artsy_red`, `artsy_white`, `color_black`, `color_blue`, `color_gold`, `color_green`, `color_red` | `polished` |
-| `paint_color` | For `painted` (the panel and the head) and `none` (the head): a theme color such as `teal`, or any CSS color such as `"#1f6f78"` | `teal` for `painted`, `light-grey` for `none` |
+| `paint_color` | For `painted`: the panel's paint, as a theme color such as `teal` or any CSS color such as `"#1f6f78"` | `teal` |
+| `head_color` | The head's color: `match` (the style's color) or a theme or CSS color; with `none`, a color | `match`; `light-grey` for `none` |
 | `pattern` | For the styles with something to randomize (all but `brushed` and `none`): any whole number; each number draws a different pattern | The default look |
 | `features_style` | `match` (the style itself), `flat` (the style's base color only) or `inset` (inset in a channel pressed into the panel); not used with `none` | `match` |
 | `fasteners` | A group of three options: | |

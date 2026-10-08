@@ -32,6 +32,7 @@
     check(JSON.stringify(written.fasteners) === JSON.stringify({ type: "rivets", color: "match", spacing: 4 }),
       `fasteners written out as a group with color match (${JSON.stringify(written.fasteners)})`);
     check(!("paint_color" in written) && !("pattern" in written), "no paint_color or pattern for Polished Aluminum until set");
+    check(written.head_color === "match", `head_color written out as match (${written.head_color})`);
 
     // The tile card's editor is used, without Icon and Show entity picture
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -41,7 +42,7 @@
     check(!names.includes('"icon"') && !names.includes('"show_entity_picture"'), "Icon and Show entity picture are left out");
     check(names.includes('"color"') && names.includes('"hide_state"'), "the other tile card options stay");
     const tileKeys = Object.keys(tileEditor?.config ?? {});
-    check(!tileKeys.some((k) => ["style", "paint_color", "pattern", "features_style", "fasteners", "fastener_spacing"].includes(k)),
+    check(!tileKeys.some((k) => ["style", "paint_color", "head_color", "pattern", "features_style", "fasteners"].includes(k)),
       `the tile card's editor gets only tile card options (${tileKeys.join(", ")})`);
 
     // A spacing with an E (YAML only) shows as the fraction and keeps its E
@@ -66,7 +67,7 @@
     look.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...look.data, collection: "none" } } }));
     let now = events.at(-1);
     check(now.style === "none" && !("pattern" in now) && !("features_style" in now), `None drops pattern and features_style (${Object.keys(now).join(", ")})`);
-    check(now.paint_color === "light-grey", `None gets a head color (${now.paint_color})`);
+    check(now.head_color === "light-grey" && !("paint_color" in now), `None gets a head color instead of match (${now.head_color})`);
     editor.setConfig({ ...now, style: "painted", features_style: "flat" });
     now = events.at(-1) ?? now;
     look.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...look.data, style: "brushed" } } }));
@@ -77,7 +78,8 @@
     // (Home Assistant then shows the error with the code editor)
     const good = events.at(-1);
     for (const [bad, expected] of [[{ fasteners: "rivets" }, "group"], [{ style: "nope" }, "Unknown style"],
-      [{ head_color: "red" }, "head_color"], [{ fastener_spacing: 8 }, "fastener_spacing"]]) {
+      [{ fastener_color: "red" }, "fastener_color"], [{ fastener_spacing: 8 }, "fastener_spacing"],
+      [{ style: "none", head_color: "match" }, "head_color"]]) {
       events.length = 0;
       try {
         editor.setConfig({ ...good, ...bad });
@@ -93,11 +95,11 @@
     fresh.addEventListener("config-changed", (ev) => freshEvents.push(ev.detail.config));
     fresh.hass = makeHass();
     document.body.append(fresh);
-    fresh.setConfig({ ...good, head_color: "red" });
+    fresh.setConfig({ ...good, fastener_color: "red" });
     await new Promise((resolve) => setTimeout(resolve, 300));
     const alert = fresh.shadowRoot.querySelector("ha-alert");
-    check(Boolean(alert) && alert.textContent.includes("head_color"), `the tile card's refusal is shown (${alert?.textContent})`);
-    check(freshEvents.every((c) => c.head_color === "red"), "the unknown option is left for the user to remove");
+    check(Boolean(alert) && alert.textContent.includes("fastener_color"), `the tile card's refusal is shown (${alert?.textContent})`);
+    check(freshEvents.every((c) => c.fastener_color === "red"), "the unknown option is left for the user to remove");
 
     // Invalid settings show a clear error on the card
     for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fasteners: { spacing: 3 } }, "spacing"],
