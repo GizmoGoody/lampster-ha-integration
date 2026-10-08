@@ -58,6 +58,13 @@ window.runChecks = (expectations = {}) => {
       const W = frame.clientWidth, H = frame.clientHeight;
       const tile = root.querySelector("hui-tile-card");
       check(title, Boolean(tile), "the tile card is inside the card");
+      // Nothing of the card clips the tile card (its callouts, such as a
+      // slider's value tooltip, can extend past the edge); only the
+      // decorations are clipped to the rounded outline
+      const clipping = [card, frame, tile].filter((el) => el && getComputedStyle(el).overflow !== "visible");
+      check(title, clipping.length === 0, `nothing clips the tile card (${clipping.map((el) => el.className || el.localName).join(", ") || "none"})`);
+      check(title, [...root.querySelectorAll(".clip")].length === 2 && [...root.querySelectorAll(".clip")].every((el) => getComputedStyle(el).overflow === "hidden"),
+        "the decorations are clipped to the outline");
 
       // The head replaces the tile card's icon
       const img = tile?.shadowRoot.querySelector("ha-tile-icon img");

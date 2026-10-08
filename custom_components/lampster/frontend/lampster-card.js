@@ -498,6 +498,7 @@ function styleSlider(slider, on, bezel) {
   if (!sliderSheet) {
     sliderSheet = new CSSStyleSheet();
     sliderSheet.replaceSync(`
+      .tooltip { z-index: 3; }
       :host([lampster-channel]) .slider .slider-track-background { opacity: 0; }
       :host([lampster-channel]) .slider .slider-track-bar {
         background-image:
@@ -628,10 +629,15 @@ class LampsterCard extends HTMLElement {
       <style>
         :host { display: block; height: 100%; }
         .frame {
-          position: relative; height: 100%; box-sizing: border-box; overflow: hidden; isolation: isolate;
+          position: relative; height: 100%; box-sizing: border-box; isolation: isolate;
           /* Exactly the tile card's own corners (ha-card), from the theme */
           border-radius: var(--ha-card-border-radius, var(--ha-border-radius-lg));
         }
+        /* Only the decorations are clipped to the rounded outline; the tile
+           card is not, so its callouts (such as a slider's value tooltip)
+           can extend past the card's edge, as on a plain tile card */
+        .clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+        #over { z-index: 2; }
         .frame.styled { box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 10px rgba(0, 0, 0, .3); }
         .frame:not(.styled) #bevel { display: none; }
         .layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -668,12 +674,16 @@ class LampsterCard extends HTMLElement {
         }
       </style>
       <div class="frame">
-        <div class="layer" id="bg"></div>
-        <svg class="layer" id="texture"></svg>
-        <div class="layer" id="gloss"></div>
-        <div class="layer" id="channels"></div>
-        <div class="layer" id="bevel"></div>
-        <svg class="layer" id="fasteners"></svg>
+        <div class="clip" id="under">
+          <div class="layer" id="bg"></div>
+          <svg class="layer" id="texture"></svg>
+          <div class="layer" id="gloss"></div>
+          <div class="layer" id="channels"></div>
+        </div>
+        <div class="clip" id="over">
+          <div class="layer" id="bevel"></div>
+          <svg class="layer" id="fasteners"></svg>
+        </div>
       </div>`;
     this._frame = this.shadowRoot.querySelector(".frame");
     this._resize = new ResizeObserver(() => this._draw());
@@ -716,7 +726,7 @@ class LampsterCard extends HTMLElement {
     if (this._hass) this._tile.hass = this._innerHass(this._hass);
     if (this._preview !== undefined) this._tile.preview = this._preview;
     if (this._layout !== undefined) this._tile.layout = this._layout;
-    this._frame.insertBefore(this._tile, this.shadowRoot.getElementById("bevel"));
+    this._frame.insertBefore(this._tile, this.shadowRoot.getElementById("over"));
     this._afterTileUpdate();
   }
 
