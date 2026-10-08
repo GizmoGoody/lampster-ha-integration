@@ -228,15 +228,15 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
 
         return _async_cancel
 
-    async def async_stop(self) -> None:
-        """Cancel timers and effects, and disconnect (used on unload)."""
+    async def async_stop(self, reason: str = "integration unloading") -> None:
+        """Cancel timers and effects, and disconnect (on unload, or when Home Assistant stops)."""
         self._stopping = True
         await self._async_stop_task()
         self._async_delete_issues()
         self._async_cancel_reconnect()
         self._async_cancel_batched_update()
         async with self._lock:
-            await self._async_disconnect("integration unloading")
+            await self._async_disconnect(reason)
 
     @callback
     def _async_handle_bluetooth_event(

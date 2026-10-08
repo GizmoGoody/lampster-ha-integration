@@ -7,8 +7,8 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ADDRESS, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_ADDRESS, EVENT_HOMEASSISTANT_STOP, Platform
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
@@ -66,6 +66,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # they receive the first poll. async_start() returns an unsubscribe
     # callback, which runs when the entry is unloaded.
     entry.async_on_unload(coordinator.async_start())
+
+    # Home Assistant does not unload config entries when it stops, so
+    # disconnect explicitly instead of abandoning the Bluetooth connection
+    async def _async_stop(event: Event) -> None:
+        await coordinator.async_stop("Home Assistant stopping")
+
+    entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_stop))
 
     # Apply changed connection options by reloading
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
