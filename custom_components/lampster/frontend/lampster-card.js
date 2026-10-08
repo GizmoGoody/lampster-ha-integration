@@ -479,12 +479,20 @@ const rgbOf = (css) => (css.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
 /**
  * A slider in a channel: the unused part shows the channel's floor, and
  * the used part looks like a slatted roll-up door sliding along it, with no
- * handle. The slider's shape is not changed, and the channel around it is
- * concentric with it. This styles parts inside Home Assistant's slider; if
- * an update renames them, the slider simply keeps its usual look.
+ * handle. The color temperature slider's marker becomes a round loupe in a
+ * beveled bezel of the card's material (bezel), filled with only the color
+ * it is on: the slider's own gradient, magnified so far that one color
+ * fills the glass, so it follows the marker while it is dragged. The
+ * slider's shape is not changed, and the channel around it is concentric
+ * with it. This styles parts inside Home Assistant's slider; if an update
+ * renames them, the slider simply keeps its usual look.
+ *
+ * With every features style, the color temperature slider moves in 100 K
+ * steps.
  */
+const TEMPERATURE_STEP = 100;
 let sliderSheet;
-function styleSlider(slider, on) {
+function styleSlider(slider, on, bezel) {
   const root = slider.shadowRoot;
   if (!root) return;
   if (!sliderSheet) {
@@ -500,15 +508,42 @@ function styleSlider(slider, on) {
         box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.35);
       }
       :host([lampster-channel]) .slider .slider-track-bar::after { display: none; }
+      :host([lampster-loupe]) .slider .slider-track-cursor {
+        --cursor-size: calc(var(--control-slider-thickness) - 4px);
+        top: 50%; bottom: auto; margin-top: calc(var(--cursor-size) / -2);
+        width: var(--cursor-size); height: var(--cursor-size); border-radius: 50%;
+        background: var(--lampster-bezel, #c3c8cc);
+        box-shadow: 0 2px 4px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.45);
+      }
+      :host([lampster-loupe]) .slider .slider-track-cursor::after {
+        inset: 4px; width: auto; height: auto; margin: 0; border-radius: 50%;
+        background:
+          radial-gradient(70% 55% at 32% 25%, rgba(255,255,255,.75), rgba(255,255,255,0) 60%),
+          radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,.18)),
+          var(--control-slider-background);
+        background-size: 100% 100%, 100% 100%, 100000% 100%;
+        background-position: 0 0, 0 0, calc(var(--value, 0) * 100%) 50%;
+        background-repeat: no-repeat;
+        box-shadow: inset 0 2px 3px rgba(0,0,0,.55), inset 0 -1px 1px rgba(255,255,255,.4);
+      }
     `);
   }
   if (!root.adoptedStyleSheets.includes(sliderSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sliderSheet];
-  // Only sliders whose unused part is a dim copy of the bar (such as
-  // brightness); a slider showing a scale (such as color temperature's
-  // gradient) keeps its look inside the channel
+  const temperature = slider.getRootNode()?.host?.localName === "hui-light-color-temp-card-feature";
+  if (temperature && slider.step !== TEMPERATURE_STEP) slider.step = TEMPERATURE_STEP;
+  // The slatted bar only for sliders whose unused part is a dim copy of the
+  // bar (such as brightness); a slider showing a scale keeps its look
   const opacity = parseFloat(getComputedStyle(slider).getPropertyValue("--control-slider-background-opacity"));
-  slider.toggleAttribute("lampster-channel", on && !(opacity >= 1));
+  slider.toggleAttribute("lampster-channel", on && !temperature && !(opacity >= 1));
+  slider.toggleAttribute("lampster-loupe", on && temperature);
+  if (on && temperature) slider.style.setProperty("--lampster-bezel", bezel);
+  else slider.style.removeProperty("--lampster-bezel");
 }
+
+// A beveled ring in a material's color, lit from the top left
+const bezelOf = (color) =>
+  `conic-gradient(from 210deg, ${shade(color, 1.45)}, ${shade(color, 0.55)} 25%, ${shade(color, 1.2)} 45%, ` +
+  `${shade(color, 0.5)} 65%, ${shade(color, 1.45)} 85%, ${color})`;
 
 /**
  * Inset styling for other controls, by an attribute on the control: color
@@ -905,12 +940,13 @@ class LampsterCard extends HTMLElement {
     }
     root.getElementById("channels").innerHTML = !inset ? "" : areas.map((b) =>
       `<div class="channel${b.slide ? " rail" : ""}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
-    // Inset, the controls look physical: a slatted slider bar, color
-    // favorites as keys, and the toggle as a slide
+    // Inset, the controls look physical: a slatted slider bar, a loupe on
+    // the color temperature slider, color favorites as keys, and the toggle
+    // as a slide
     // These style parts inside Home Assistant's controls; if that ever
     // fails, the controls keep their usual look and the card still draws
     try {
-      for (const slider of controls.sliders) styleSlider(slider, inset);
+      for (const slider of controls.sliders) styleSlider(slider, inset, bezelOf(look.metal));
       for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
       for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
       this._swatches = inset ? controls.swatches : [];

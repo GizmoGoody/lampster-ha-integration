@@ -93,9 +93,16 @@ window.runChecks = (expectations = {}) => {
       } else if (style === "inset") {
         check(title, channels === areas, `a channel around each feature area (${channels} of ${areas})`);
         for (const slider of tile ? deep(tile, "ha-control-slider") : []) {
-          const temp = slider.getAttribute("kind") === "temp";
+          const temp = slider.getAttribute("mode") === "cursor";
           check(title, slider.hasAttribute("lampster-channel") === !temp,
-            temp ? "the color temperature slider keeps its look" : "the brightness slider has the slide look");
+            temp ? "the color temperature slider keeps its gradient" : "the brightness slider has the slide look");
+          if (temp) {
+            check(title, slider.hasAttribute("lampster-loupe") && slider.style.getPropertyValue("--lampster-bezel").includes("conic-gradient"),
+              "the color temperature marker is a loupe with a bezel");
+            const cursor = slider.shadowRoot.querySelector(".slider-track-cursor");
+            const r = cursor?.getBoundingClientRect();
+            check(title, r && Math.abs(r.width - r.height) < 0.5 && getComputedStyle(cursor).borderTopLeftRadius === "50%", "the loupe is round");
+          }
         }
         for (const toggle of tile ? deep(tile, "ha-control-switch") : []) {
           check(title, toggle.hasAttribute("lampster-slide"), "the toggle has the slide look");
@@ -134,6 +141,11 @@ window.runChecks = (expectations = {}) => {
         }
       } else {
         check(title, channels === 0, "no channels");
+      }
+      // The color temperature slider moves in 100 K steps with every features style
+      for (const slider of tile ? deep(tile, "ha-control-slider") : []) {
+        if (slider.getAttribute("mode") === "cursor") check(title, slider.step === 100, `color temperature steps of 100 K (${slider.step})`);
+        if (style !== "inset" || config.style === "none") check(title, !slider.hasAttribute("lampster-loupe"), "no loupe outside Inset");
       }
       if (style !== "match" && config.style !== "none" && textured && areas) {
         check(title, masked, "the texture is kept off the features");
