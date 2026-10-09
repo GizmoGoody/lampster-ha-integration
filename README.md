@@ -131,7 +131,7 @@ The card is Home Assistant's tile card in a finish of your choice. Every tile ca
 - **Collection** and **Style**: Metal (Polished Aluminum, Brushed Aluminum, Rusted Steel, or Painted in any color), Lampster Army, Lampster Artsy or Lampster Color. Collection **None** keeps your theme's own tile card and adds only the head, in a **Head color** of your choice, and the fasteners
 - **Head color**: the head takes the style's color (Match style), or any color you choose, with every style
 - **Randomize**: draws new reflections, rust, wear, splatter or sheen and keeps every other setting (every style except Brushed Aluminum)
-- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or inset in a channel pressed into the panel (Inset). Inset, the brightness slider keeps its shape and its bar looks like a slatted roll-up door ending in a raised ridge, the color temperature slider's marker is a round loupe in a beveled bezel of the card's material, filled with the color it is on, the color favorites are keys that press in (the one matching the light stays pressed), and the toggle is a slide with a beveled tab. With Flat and Inset, the style still shows between the color favorites
+- **Features style**: the slider and other features sit on the style itself (Match style), on a flat patch of the style's base color without rust, wear or splatter (Flat), or in a console, with channels pressed into the panel (Console). In a console, the brightness slider keeps its shape and its bar looks like a slatted roll-up door ending in a raised ridge, the color temperature slider's marker is a round loupe in a beveled bezel of the card's material, filled with the color it is on, the color favorites are keys that press in (the one matching the light stays pressed), and the toggle is a slide with a beveled tab. With Flat and Console, the style still shows between the color favorites
 - **Fasteners**: Rivets, Phillips, Hex, Socket or None, matching the style or in any color
 - **Fastener spacing**: Corners only, or fasteners all the way around at 1/2, 1/4, 1/8, 1/16, 1/32 or 1/64 spacing. Fasteners that would touch the head or the features are left out. For one fastener at each end of a single-row card instead of in its corners, add an E to the spacing in YAML (see below)
 - **Color temperature**: on this card, the color temperature slider moves in steps of 100 K, and The Lampster follows it while it is dragged
@@ -151,7 +151,7 @@ features:
 style: rusted              # see the list below
 head_color: match          # match (the style's color), a theme color such as amber, or any CSS color
 pattern: 4242              # the reflections, rust, wear, splatter or sheen pattern
-features_style: match      # match, flat or inset
+features_style: match      # match, flat or console
 fasteners:
   type: rivets             # rivets, phillips, hex, socket or none
   color: match             # match, a theme color such as amber, or any CSS color
@@ -166,7 +166,7 @@ For Painted, `paint_color` sets the paint of the panel (and of the head, unless 
 | `paint_color` | For `painted`: the panel's paint, as a theme color such as `teal` or any CSS color such as `"#1f6f78"` | `teal` |
 | `head_color` | The head's color: `match` (the style's color) or a theme or CSS color; with `none`, a color | `match`; `light-grey` for `none` |
 | `pattern` | For the styles with something to randomize (all but `brushed` and `none`): any whole number; each number draws a different pattern | The default look |
-| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `inset` (inset in a channel pressed into the panel); not used with `none` | `match` |
+| `features_style` | `match` (the style itself), `flat` (the style's base color only) or `console` (channels pressed into the panel); not used with `none` | `match` |
 | `fasteners` | A group of three options: | |
 | `  type` | `rivets`, `phillips`, `hex`, `socket` or `none` | `rivets` |
 | `  color` | `match` (follows the style), a theme color such as `amber`, or any CSS color | `match` |
