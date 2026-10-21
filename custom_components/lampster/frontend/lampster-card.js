@@ -503,7 +503,8 @@ class LampsterCard extends HTMLElement {
         :host { display: block; height: 100%; }
         .frame {
           position: relative; height: 100%; box-sizing: border-box; overflow: hidden; isolation: isolate;
-          border-radius: var(--ha-card-border-radius, 12px);
+          /* Exactly the tile card's own corners (ha-card), from the theme */
+          border-radius: var(--ha-card-border-radius, var(--ha-border-radius-lg));
         }
         .frame.styled { box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 10px rgba(0, 0, 0, .3); }
         .frame:not(.styled) #bevel { display: none; }
@@ -751,7 +752,13 @@ class LampsterCard extends HTMLElement {
       const { points, fixed } = fastenerPositions(spacing, W, H, radius, inset, ends);
       markup = `<defs>${fastenerSymbols(p)}</defs>` +
         points
-          .filter(([x, y], i) => i < fixed || clear(x, y))
+          .filter(([x, y], i, all) => {
+            if (i < fixed) return true;
+            // After the fixed ones, fasteners come in mirrored pairs (top and
+            // bottom, or left and right ends); keep a pair only if both are clear
+            const mate = all[fixed + ((i - fixed) ^ 1)];
+            return clear(x, y) && (!mate || clear(mate[0], mate[1]));
+          })
           .map(([x, y], i) =>
             `<use href="#${p}${fasteners}" color="${color}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"` +
             ` transform="rotate(${fasteners === "rivets" ? 0 : (i * 37) % 90} ${x} ${y})"/>`).join("");
