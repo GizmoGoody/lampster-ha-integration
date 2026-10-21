@@ -69,8 +69,7 @@ Control the light like any other HA light:
 
 ### Support
 
-- **Issues**: [GitHub Issues](https://github.com/yamanote1138/lampster-ha-integration/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yamanote1138/lampster-ha-integration/discussions)
+- **Issues**: [GitHub Issues](https://github.com/GizmoGoody/lampster-ha-integration/issues)
 
 ### Credits
 
