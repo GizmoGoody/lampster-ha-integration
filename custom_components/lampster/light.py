@@ -175,6 +175,11 @@ class LampsterLight(LampsterEntity, LightEntity):
             else:
                 self._attr_brightness = 0
 
+        if self.coordinator.effect:
+            # The effect's own writes are not reported; show the brightness
+            # it was started at
+            self._attr_brightness = self.coordinator.effect_brightness
+
     async def async_added_to_hass(self) -> None:
         """Add default favorite colors the user does not already have.
 

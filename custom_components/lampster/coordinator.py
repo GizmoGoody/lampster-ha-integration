@@ -159,6 +159,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data: LampState | None = None
         self.temperature: float | None = None
         self.effect: str | None = None
+        self.effect_brightness = 255
 
         # Diagnostics
         self.last_connect_ms: int | None = None
@@ -563,6 +564,13 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         mode = effect_mode(effect, self.data)
         steps = effect_steps(effect, brightness, self.data)
         self.effect = effect
+        self.effect_brightness = brightness
+        # The effect's writes are not reported, so The Lampster would still
+        # show as off when an effect is started from off; it is on in the
+        # effect's mode until the effect stops
+        self.data = dataclasses.replace(
+            self.data or LampState(is_on=True, mode=mode), is_on=True, mode=mode
+        )
         self._async_start_task(mode, steps, f"effect {effect}")
         self._record(f"Started effect {effect}")
         self.async_update_listeners()

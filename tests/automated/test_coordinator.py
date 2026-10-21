@@ -236,6 +236,27 @@ async def test_effect_stopped_by_command(
     assert coordinator.data.mode == "white"
 
 
+async def test_effect_from_off_shows_on(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """An effect started while off shows The Lampster as on while it runs."""
+    lamp.mode = 0x48  # white, off
+    coordinator = make_coordinator()
+    await coordinator._async_try_connect("check interval")
+    assert coordinator.data.is_on is False
+
+    await coordinator.async_start_effect("fireplace", 200)
+    assert coordinator.data.is_on
+    assert coordinator.data.mode == "rgb"
+    assert coordinator.effect_brightness == 200
+    await asyncio.sleep(0.5)
+    await hass.async_block_till_done()
+    assert coordinator.data.is_on  # the lamp's own mode report does not undo it
+
+    await coordinator.async_stop_effect()
+    assert coordinator.data.is_on  # stopped, it keeps the last color
+
+
 async def test_touch_off_during_effect_stays_off(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:
