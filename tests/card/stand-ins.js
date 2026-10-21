@@ -49,11 +49,27 @@ const sliderCss = (value, background, opacity) => `<style>
     top: 0; bottom: 0; right: var(--handle-margin); height: 50%; width: 4px; }
 </style><div class="container"><div class="slider"><div class="slider-track-background"></div><div class="slider-track-bar"></div></div></div>`;
 customElements.define("ha-control-slider", class extends StandIn {
+  constructor() {
+    super();
+    this.step = 1;
+  }
+
   connectedCallback() {
-    const temp = this.getAttribute("kind") === "temp";
-    this.shadowRoot.innerHTML = temp
-      ? sliderCss(0.2, "linear-gradient(90deg, #ffb36b, #fff4e8 70%, #fff)", 1)
-      : sliderCss(0.59, "var(--control-slider-color)", 0.2);
+    if (this.getAttribute("mode") === "cursor") {
+      // Color temperature: a gradient with a marker (cursor) at the value
+      this.shadowRoot.innerHTML = sliderCss(0.2, "linear-gradient(to right, #ffb36b, #fff4e8 70%, #fff)", 1)
+        .replace('<div class="slider-track-bar"></div>', '<div class="slider-track-cursor"></div>')
+        .replace("</style>", `
+          .slider .slider-track-cursor { --cursor-size: calc(var(--control-slider-thickness) / 4); position: absolute; background-color: white;
+            border-radius: min(var(--handle-size), var(--control-slider-border-radius)); top: 0; bottom: 0;
+            left: calc(var(--value, 0) * (100% - var(--cursor-size))); width: var(--cursor-size); }
+          .slider .slider-track-cursor:after { display: block; content: ""; background-color: #888; position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0; margin: auto; border-radius: var(--handle-size); height: 50%; width: var(--handle-size); }
+          .container { --value: 0.2; }
+        </style>`);
+    } else {
+      this.shadowRoot.innerHTML = sliderCss(0.59, "var(--control-slider-color)", 0.2);
+    }
   }
 });
 
@@ -94,17 +110,18 @@ const featureStyles = `ha-control-switch { --control-switch-padding: 0px; }`;
 // hui-card-feature: one feature
 const FEATURE_HTML = {
   "light-brightness": () => `<ha-control-slider></ha-control-slider>`,
-  "light-color-temp": () => `<ha-control-slider kind="temp"></ha-control-slider>`,
+  "light-color-temp": () => `<ha-control-slider mode="cursor"></ha-control-slider>`,
   "light-color-favorites": () => `<div style="display: flex; gap: 12px; height: var(--feature-height, 42px)">${
     ["#ff2222", "#44ff00", "#3333ff", "#55ffff", "#ff22ff"].map((color) =>
       `<ha-favorite-color-button color="${color}" style="flex: 1; height: 100%; --ha-favorite-color-button-border-radius: var(--feature-border-radius, 12px)"></ha-favorite-color-button>`).join("")}</div>`,
   "light-effect": () => `<div data-control style="height: var(--feature-height, 42px); border-radius: var(--feature-border-radius, 12px); background: rgba(255,255,255,.12)"></div>`,
   "toggle": () => `<ha-control-switch></ha-control-switch>`,
 };
-// The feature's own element (such as hui-toggle-card-feature), holding its control
-// A page can set window.featureDelay to render the controls late, like a
-// feature whose code loads after the card has drawn
-customElements.define("hui-stand-in-card-feature", class extends StandIn {
+// The feature's own element, named like Home Assistant's (such as
+// hui-light-color-temp-card-feature), holding its control. A page can set
+// window.featureDelay to render the controls late, like a feature whose code
+// loads after the card has drawn
+class StandInFeature extends StandIn {
   connectedCallback() {
     const render = () => {
       this.shadowRoot.innerHTML = `<style>:host { display: block; } ${featureStyles}</style>${FEATURE_HTML[this.getAttribute("type")]()}`;
@@ -112,10 +129,13 @@ customElements.define("hui-stand-in-card-feature", class extends StandIn {
     if (window.featureDelay) setTimeout(render, window.featureDelay);
     else render();
   }
-});
+}
+for (const type of Object.keys(FEATURE_HTML)) {
+  customElements.define(`hui-${type}-card-feature`, class extends StandInFeature {});
+}
 customElements.define("hui-card-feature", class extends StandIn {
   connectedCallback() {
-    this.shadowRoot.innerHTML = `<style>:host > * { pointer-events: auto; }</style><hui-stand-in-card-feature type="${this.getAttribute("type")}"></hui-stand-in-card-feature>`;
+    this.shadowRoot.innerHTML = `<style>:host > * { pointer-events: auto; }</style><hui-${this.getAttribute("type")}-card-feature type="${this.getAttribute("type")}"></hui-${this.getAttribute("type")}-card-feature>`;
   }
 });
 
