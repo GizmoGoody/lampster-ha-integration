@@ -6,7 +6,7 @@
  * - a style (finish) drawn behind the tile card, with a raised edge,
  * - fasteners drawn on top of it, clear of the icon and the controls,
  * - the features (such as the brightness slider) on the style, on a flat
- *   patch of it, or inset in a channel pressed into the panel, and
+ *   patch of it, or in a console: channels pressed into the panel, and
  * - a picture of The Lampster's head in place of the tile card's icon, shown
  *   through the tile card's own "show entity picture" option. The light's
  *   color fills the lens. The picture is built in memory; no files are written.
@@ -58,7 +58,7 @@ const RANDOMIZED = (style) =>
 
 // "match" is written out and labeled "Match style" wherever it is offered
 const MATCH = ["match", "Match style"];
-const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["inset", "Inset"]];
+const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["console", "Console"]];
 
 const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"], ["socket", "Socket"], ["none", "None"]];
 /**
@@ -552,7 +552,7 @@ const bezelOf = (color) =>
   `${shade(color, 0.5)} 65%, ${shade(color, 1.45)} 85%, ${color})`;
 
 /**
- * Inset styling for other controls, by an attribute on the control: color
+ * Console styling for other controls, by an attribute on the control: color
  * favorites as 3D keys that press in when touched (and stay in while they
  * match the light), and the toggle as a slide whose tab is beveled and
  * whose off side shows the channel's floor. Like the slider, this styles
@@ -877,7 +877,7 @@ class LampsterCard extends HTMLElement {
     // The areas the features take: each feature, except that each color
     // favorite counts on its own (so the style shows between them); a group
     // whose features cannot be told apart counts as one. An area's corner
-    // radius is its control's, so an inset around it follows the same curve.
+    // radius is its control's, so a channel around it follows the same curve.
     const features = [];
     const sliders = [];
     const swatches = [];
@@ -969,12 +969,12 @@ class LampsterCard extends HTMLElement {
     const root = this.shadowRoot;
 
     // The features: on the style itself, on a flat patch of the style's base
-    // (no rust, wear or splatter), or inset in a channel pressed into the
+    // (no rust, wear or splatter), or in a console: a channel pressed into the
     // panel. The channel's corners are concentric with the feature's.
     const featuresStyle = look.theme ? "match" : this._config.features_style;
     this._frame.classList.toggle("styled", !look.theme);
-    const inset = featuresStyle === "inset";
-    const pad = inset ? 3 : 0;
+    const consoleStyle = featuresStyle === "console";
+    const pad = consoleStyle ? 3 : 0;
     const areas = featuresStyle === "match" ? [] : controls.features.map((b) => {
       // A toggle rides close in its channel, like a magnet on a rail
       const gap = b.slide ? Math.min(pad, 1.5) : pad;
@@ -985,21 +985,21 @@ class LampsterCard extends HTMLElement {
       const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
       texture = `<defs><mask id="${p}clear"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs><g mask="url(#${p}clear)">${texture}</g>`;
     }
-    root.getElementById("channels").innerHTML = !inset ? "" : areas.map((b) =>
+    root.getElementById("channels").innerHTML = !consoleStyle ? "" : areas.map((b) =>
       `<div class="channel${b.slide ? " rail" : ""}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
-    // Inset, the controls look physical: a slatted slider bar, a loupe on
+    // In a console, the controls look physical: a slatted slider bar, a loupe on
     // the color temperature slider, color favorites as keys, and the toggle
     // as a slide
     // These style parts inside Home Assistant's controls; if that ever
     // fails, the controls keep their usual look and the card still draws
     try {
       for (const slider of controls.sliders) {
-        styleSlider(slider, inset, bezelOf(look.metal));
+        styleSlider(slider, consoleStyle, bezelOf(look.metal));
         this._followWhileDragged(slider);
       }
-      for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
-      for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
-      this._swatches = inset ? controls.swatches : [];
+      for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", consoleStyle);
+      for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", consoleStyle);
+      this._swatches = consoleStyle ? controls.swatches : [];
       this._markPressed();
     } catch (err) {
       console.warn("The Lampster card: could not style the controls", err);
@@ -1018,8 +1018,8 @@ class LampsterCard extends HTMLElement {
     let markup = "";
     if (fasteners !== "none") {
       const compact = H < 80;  // a single row
-      // An inset takes room around the features: move the fasteners outward
-      const edge = (compact ? 5 : 7) - (inset ? 1.5 : 0);
+      // A console takes room around the features: move the fasteners outward
+      const edge = (compact ? 5 : 7) - (consoleStyle ? 1.5 : 0);
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = fastenerColor === "match" ? look.metal : resolveColor(fastenerColor, this, look.metal);
       const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);

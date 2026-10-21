@@ -86,8 +86,8 @@ window.runChecks = (expectations = {}) => {
         check(title, mirrored, "the top and bottom fasteners match");
       }
 
-      // Features style: Inset puts a channel around each feature (each color
-      // favorite on its own); Flat and Inset keep the texture off them
+      // Features style: Console puts a channel around each feature (each color
+      // favorite on its own); Flat and Console keep the texture off them
       const featureEls = tile ? deep(tile, "hui-card-feature") : [];
       const swatches = tile ? deep(tile, "ha-favorite-color-button") : [];
       const areas = featureEls.length - featureEls.filter((f) => deep(f, "ha-favorite-color-button").length).length + swatches.length;
@@ -97,7 +97,7 @@ window.runChecks = (expectations = {}) => {
       const textured = root.getElementById("texture").innerHTML.replace(/<defs>[\s\S]*?<\/defs>/, "").trim().length > 0;
       if (config.style === "none") {
         check(title, channels === 0, "no channels with style none");
-      } else if (style === "inset") {
+      } else if (style === "console") {
         check(title, channels === areas, `a channel around each feature area (${channels} of ${areas})`);
         for (const slider of tile ? deep(tile, "ha-control-slider") : []) {
           const temp = slider.getAttribute("mode") === "cursor";
@@ -152,7 +152,7 @@ window.runChecks = (expectations = {}) => {
       // The color temperature slider moves in 100 K steps with every features style
       for (const slider of tile ? deep(tile, "ha-control-slider") : []) {
         if (slider.getAttribute("mode") === "cursor") check(title, slider.step === 100, `color temperature steps of 100 K (${slider.step})`);
-        if (style !== "inset" || config.style === "none") check(title, !slider.hasAttribute("lampster-loupe"), "no loupe outside Inset");
+        if (style !== "console" || config.style === "none") check(title, !slider.hasAttribute("lampster-loupe"), "no loupe outside Console");
       }
       if (style !== "match" && config.style !== "none" && textured && areas) {
         check(title, masked, "the texture is kept off the features");

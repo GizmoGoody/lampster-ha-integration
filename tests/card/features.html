@@ -20,15 +20,15 @@
   const all = ["light-brightness", "light-color-temp", "light-color-favorites", "light-effect", "toggle"].map((type) => ({ type }));
   const large = { features: all, features_position: "inline" };
   const size = { height: 230, width: 420 };
-  for (const features_style of ["match", "flat", "inset"]) {
+  for (const features_style of ["match", "flat", "console"]) {
     addCard(`all features, ${features_style}`, { style: "artsy_red", features_style, fasteners: { spacing: 32 }, ...large }, size);
   }
-  addCard("all features below, inset", { style: "polished", features_style: "inset", features: all }, { height: 320, width: 420 });
-  addCard("pill theme, inset", { style: "polished", features_style: "inset", ...large }, { ...size, className: "pill" });
-  addCard("scaled to 80% (editor preview), inset", { style: "rusted", features_style: "inset", ...large }, { ...size, className: "scaled" });
-  addCard("scaled to 80%, pill theme, inset", { style: "color_gold", features_style: "inset", ...large }, { ...size, className: "scaled pill" });
+  addCard("all features below, console", { style: "polished", features_style: "console", features: all }, { height: 320, width: 420 });
+  addCard("pill theme, console", { style: "polished", features_style: "console", ...large }, { ...size, className: "pill" });
+  addCard("scaled to 80% (editor preview), console", { style: "rusted", features_style: "console", ...large }, { ...size, className: "scaled" });
+  addCard("scaled to 80%, pill theme, console", { style: "color_gold", features_style: "console", ...large }, { ...size, className: "scaled pill" });
   // The color favorite matching the light's color stays pressed; none when off
-  addCard("pressed key", { style: "polished", features_style: "inset", ...large }, size);
-  addCard("no pressed key when off", { style: "polished", features_style: "inset", ...large }, { ...size, hass: makeHass({}, "off") });
+  addCard("pressed key", { style: "polished", features_style: "console", ...large }, size);
+  addCard("no pressed key when off", { style: "polished", features_style: "console", ...large }, { ...size, hass: makeHass({}, "off") });
   runChecks({ pressed: { "pressed key": ["#3333ff"], "no pressed key when off": [] } });
 </script>

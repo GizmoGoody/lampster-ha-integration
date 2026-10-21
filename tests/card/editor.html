@@ -63,7 +63,7 @@
 
     // Switching styles removes the options the new style does not use
     const look = editor.shadowRoot.getElementById("look");
-    editor.setConfig({ ...events.at(-1), style: "rusted", pattern: 4242, features_style: "inset" });
+    editor.setConfig({ ...events.at(-1), style: "rusted", pattern: 4242, features_style: "console" });
     look.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...look.data, collection: "none" } } }));
     let now = events.at(-1);
     check(now.style === "none" && !("pattern" in now) && !("features_style" in now), `None drops pattern and features_style (${Object.keys(now).join(", ")})`);
