@@ -203,9 +203,12 @@ class LampsterClient:
             await asyncio.sleep(0.4)
 
     async def power_on(self):
-        """Turn the lamp on.
+        """Turn the lamp on the way its touch button does.
 
-        Sets lamp to warm white at 50% brightness.
+        Sets the power bit of the current mode, so the lamp comes back in the
+        mode and at the levels it was turned off with, then reads them. If
+        that would leave it dark (the levels are zero), turns it on in warm
+        white at 50% instead.
 
         Raises:
             ConnectionError: If not connected
@@ -215,20 +218,29 @@ class LampsterClient:
             raise ConnectionError("Not connected to device")
 
         try:
-            # Power on with warm white at 50% brightness
-            from .models import WhiteColor
-
-            await self._write_mode(MODE_POWER_ON)
-            await asyncio.sleep(0.4)  # Device needs time to process mode change
-            await self._write_mode(MODE_WHITE)
-            await self._client.write_gatt_char(CHAR_WHITE, bytes([50, 0]), response=False)
-
-            self._state.is_on = True
-            self._state.mode = "white"
-            self._state.white_color = WhiteColor(50, 0)
-            _LOGGER.info("Lamp powered on (warm white 50%)")
+            mode = await self._read_mode()
+            if not mode & MODE_BIT_POWER:
+                await self._write_mode(mode | MODE_BIT_POWER)
+            state = await self.read_state()
+            color = state.rgb_color if state.mode == "rgb" else state.white_color
+            if state.is_on and color and any(color.to_bytes()):
+                self._state = state
+                _LOGGER.info(f"Lamp powered on as it was: {state}")
+                return
+        except CommandError:
+            raise
         except Exception as e:
             raise CommandError(f"Failed to power on: {e}") from e
+        await self._power_on_default()
+
+    async def _power_on_default(self):
+        """Turn the lamp on in warm white at 50%.
+
+        Goes through set_white_color, which only sends POWER_ON while the
+        lamp is still off (the lamp rejects it while on).
+        """
+        await self.set_white_color(WhiteColor(50, 0))
+        _LOGGER.info("Lamp powered on (warm white 50%)")
 
     async def power_off(self):
         """Turn the lamp off the way its touch button does.
