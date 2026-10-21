@@ -29,14 +29,21 @@ from .registry import find_device
 
 
 def _bluetooth_source(coordinator: LampsterCoordinator) -> str | None:
-    """Return the name of the adapter or proxy that last heard the lamp.
+    """Return the name of the adapter or proxy the lamp is reached through.
 
-    Uses the device name as shown in Home Assistant (including any name the
-    user gave it), falling back to the scanner's own name.
+    While connected, this is the one holding the connection; while
+    disconnected, the one that last heard the lamp's advertisement. Uses the
+    device name as shown in Home Assistant (including any name the user gave
+    it), falling back to the scanner's own name.
     """
-    if not (service_info := coordinator.last_service_info):
+    if coordinator.connected:
+        source = coordinator.connection_source
+    elif service_info := coordinator.last_service_info:
+        source = service_info.source
+    else:
+        source = None
+    if source is None:
         return None
-    source = service_info.source
     registry = dr.async_get(coordinator.hass)
     for connection in (
         (dr.CONNECTION_BLUETOOTH, source.upper()),
@@ -56,6 +63,9 @@ class LampsterSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[LampsterCoordinator], str | int | float | None]
     # Only meaningful while connected (the lamp reports it over the connection)
     requires_connection: bool = False
+    # Only meaningful while the lamp advertises, which it stops doing while
+    # connected; there is no signal strength for a connection
+    requires_advertisement: bool = False
     # Entity ID becomes sensor.lampster_<object_id> (defaults to key)
     object_id: str | None = None
 
@@ -87,6 +97,7 @@ SENSORS: tuple[LampsterSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
         state_class=SensorStateClass.MEASUREMENT,
+        requires_advertisement=True,
         value_fn=lambda c: c.last_service_info.rssi if c.last_service_info else None,
     ),
     LampsterSensorEntityDescription(
@@ -156,6 +167,12 @@ class LampsterSensor(LampsterEntity, SensorEntity):
         """Return True if the value can currently be known."""
         if self.entity_description.requires_connection:
             return super().available and self.coordinator.connected
+        if self.entity_description.requires_advertisement:
+            return (
+                super().available
+                and not self.coordinator.connected
+                and self.coordinator.last_service_info is not None
+            )
         return super().available
 
     @property

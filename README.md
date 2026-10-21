@@ -223,11 +223,11 @@ Found on the device page under **Diagnostic**. Signal strength, Connect time, Co
 
 | Entity | Meaning |
 |--------|---------|
-| Signal strength | RSSI of the last advertisement (dBm) |
+| Signal strength | Signal strength of The Lampster's Bluetooth advertisements (dBm). Unavailable while connected: The Lampster stops advertising while connected, and Bluetooth adapters and proxies do not report the signal strength of a connection |
 | Connect time | How long the last BLE connection took to establish (ms) |
 | Command time | How long the last command took once connected (ms) |
 | Internal temperature | Temperature reported by The Lampster about every 5 s while connected (°C); probably the LEDs or circuit board |
-| Bluetooth uplink | Bluetooth adapter or proxy that last heard The Lampster, by its name in Home Assistant |
+| Bluetooth uplink | Bluetooth adapter or proxy holding the connection, by its name in Home Assistant (as listed under the connection slots in **Settings** → **Bluetooth**). While disconnected, the one that last heard The Lampster. Unknown if the adapter or proxy does not report its connections |
 | Connection | Connection status in one word (see below) |
 
 ## Troubleshooting
