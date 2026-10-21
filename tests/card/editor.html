@@ -73,6 +73,32 @@
     now = events.at(-1);
     check(now.style === "brushed" && !("paint_color" in now) && !("pattern" in now), `Brushed Aluminum drops paint_color and pattern (${Object.keys(now).join(", ")})`);
 
+    // The editor repairs nothing: settings the card refuses are refused
+    // (Home Assistant then shows the error with the code editor)
+    const good = events.at(-1);
+    for (const [bad, expected] of [[{ fasteners: "rivets" }, "group"], [{ style: "nope" }, "Unknown style"],
+      [{ head_color: "red" }, "head_color"], [{ fastener_spacing: 8 }, "fastener_spacing"]]) {
+      events.length = 0;
+      try {
+        editor.setConfig({ ...good, ...bad });
+        check(false, `the editor accepted ${JSON.stringify(bad)}`);
+      } catch (err) {
+        check(err.message.includes(expected) && events.length === 0, `the editor refuses ${JSON.stringify(bad)} and changes nothing: ${err.message}`);
+      }
+    }
+
+    // A new editor refused by the tile card's editor (which loads after it opens) says so
+    const fresh = document.createElement("lampster-card-editor");
+    const freshEvents = [];
+    fresh.addEventListener("config-changed", (ev) => freshEvents.push(ev.detail.config));
+    fresh.hass = makeHass();
+    document.body.append(fresh);
+    fresh.setConfig({ ...good, head_color: "red" });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const alert = fresh.shadowRoot.querySelector("ha-alert");
+    check(Boolean(alert) && alert.textContent.includes("head_color"), `the tile card's refusal is shown (${alert?.textContent})`);
+    check(freshEvents.every((c) => c.head_color === "red"), "the unknown option is left for the user to remove");
+
     // Invalid settings show a clear error on the card
     for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fasteners: { spacing: 3 } }, "spacing"],
       [{ fasteners: { type: "nails" } }, "type"], [{ fasteners: "rivets" }, "group"], [{ features_style: "channel" }, "features_style"]]) {

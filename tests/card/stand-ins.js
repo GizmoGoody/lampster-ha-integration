@@ -205,7 +205,13 @@ customElements.define("hui-tile-card-editor", class extends StandIn {
     ];
   }
 
+  // Like Home Assistant's, it refuses options it does not know
   setConfig(config) {
+    const known = ["type", "view_layout", "layout_options", "grid_options", "visibility", "entity", "name", "icon", "color",
+      "show_entity_picture", "hide_state", "state_content", "vertical", "tap_action", "hold_action", "double_tap_action",
+      "icon_tap_action", "icon_hold_action", "icon_double_tap_action", "features", "features_position", "time_format"];
+    const unknown = Object.keys(config).find((key) => !known.includes(key));
+    if (unknown) throw new Error(`At path: ${unknown} -- Expected a value of type \`never\`, but received: \`${JSON.stringify(config[unknown])}\``);
     this.config = config;
     this.schemaNames = JSON.stringify(this._schema());
   }

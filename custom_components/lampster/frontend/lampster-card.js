@@ -1082,7 +1082,7 @@ class LampsterCardEditor extends HTMLElement {
       const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
       if (!step) return;
       ev.preventDefault();
-      const index = FASTENERS.findIndex(([value]) => value === validateForEditor(this._config).fasteners.type);
+      const index = FASTENERS.findIndex(([value]) => value === settings(this._config).fasteners.type);
       const [value] = FASTENERS[(index + step + FASTENERS.length) % FASTENERS.length];
       this._updateFasteners({ type: value });
       choices.querySelector(`[data-value="${value}"]`).focus();
@@ -1103,8 +1103,16 @@ class LampsterCardEditor extends HTMLElement {
     if (this._tileEditor) this._tileEditor.lovelace = lovelace;
   }
 
-  // Called with every change, including edits in the YAML editor
+  /**
+   * Called with every change, including edits in the YAML editor. Settings
+   * the card cannot use are not repaired: they are refused (this throws), so
+   * Home Assistant shows the error with the code editor. Options that are
+   * not the card's go to the tile card's editor, which refuses the ones it
+   * does not know.
+   */
   setConfig(config) {
+    settings(config);
+    if (this._tileEditor) this._tileEditor.setConfig(tileConfig(config));
     this._config = explicit(config);
     this._collection = undefined;
     this._render();
@@ -1139,11 +1147,21 @@ class LampsterCardEditor extends HTMLElement {
       })();
       await this._loading;
     }
-    this._tileEditor.setConfig(tileConfig(this._config));
+    try {
+      this._tileEditor.setConfig(tileConfig(this._config));
+      this._tileError?.remove();
+    } catch (err) {
+      // Only possible the first time (later, setConfig refuses it at once):
+      // show the tile card's message; the code editor fixes the YAML
+      this._tileError ??= document.createElement("ha-alert");
+      this._tileError.setAttribute("alert-type", "error");
+      this._tileError.textContent = `The tile card's options cannot be shown: ${err.message}`;
+      this._tileEditor.before(this._tileError);
+    }
   }
 
   _render() {
-    const c = validateForEditor(this._config);
+    const c = settings(this._config);
     const collection = COLLECTIONS.find((g) => g.id === (this._collection ?? collectionOf(c.style)));
     const [look, controls, fasteners] = this._forms;
     const none = c.style === "none";
@@ -1187,7 +1205,7 @@ class LampsterCardEditor extends HTMLElement {
   _formChanged(ev) {
     ev.stopPropagation();
     const value = ev.detail.value;
-    const c = validateForEditor(this._config);
+    const c = settings(this._config);
     if (value.collection !== collectionOf(c.style) && value.style === c.style) {
       // A new collection: start on its first style
       this._collection = value.collection;
@@ -1227,9 +1245,9 @@ class LampsterCardEditor extends HTMLElement {
 }
 
 /**
- * The configuration as the editor saves it: every option the chosen style
- * uses written out, defaults included (so "match" appears in the YAML), and
- * the options it does not use removed:
+ * The configuration as the editor saves it, from settings the card accepts:
+ * every option the chosen style uses written out, defaults included (so
+ * "match" appears in the YAML), and the options it does not use removed:
  * - paint_color only for Painted and None,
  * - pattern only for styles with something to randomize,
  * - features_style for every style but None,
@@ -1237,14 +1255,14 @@ class LampsterCardEditor extends HTMLElement {
  */
 function explicit(config) {
   const c = { ...config };
-  const style = STYLES[c.style] ? c.style : DEFAULTS.style;
+  const style = c.style ?? DEFAULTS.style;
   c.style = style;
   if (usesPaint(style)) c.paint_color ??= DEFAULT_PAINT[style];
   else delete c.paint_color;
   if (!RANDOMIZED(style)) delete c.pattern;
   if (style === "none") delete c.features_style;
   else c.features_style ??= DEFAULTS.features_style;
-  const given = c.fasteners && typeof c.fasteners === "object" && !Array.isArray(c.fasteners) ? c.fasteners : {};
+  const given = c.fasteners ?? {};
   const type = given.type ?? FASTENER_DEFAULTS.type;
   c.fasteners = type === "none"
     ? { type }
@@ -1252,19 +1270,9 @@ function explicit(config) {
   return c;
 }
 
-// The editor shows what the card would draw, without failing on a half-typed YAML value
-function validateForEditor(config) {
-  try {
-    return validate({ entity: "-", ...config });
-  } catch (err) {
-    const c = { ...DEFAULTS, ...explicit(config) };
-    if (!FEATURES_STYLES.some(([id]) => id === c.features_style)) c.features_style = DEFAULTS.features_style;
-    if (!FASTENERS.some(([id]) => id === c.fasteners.type)) c.fasteners.type = FASTENER_DEFAULTS.type;
-    c.fasteners.color ??= FASTENER_DEFAULTS.color;
-    c.fasteners.spacing = parseSpacing(c.fasteners.spacing ?? FASTENER_DEFAULTS.spacing)?.value ?? FASTENER_DEFAULTS.spacing;
-    return c;
-  }
-}
+// The settings as the card reads them, checked the same way (the entity is
+// chosen in the tile card's part of the editor, so it may still be missing)
+const settings = (config) => validate({ ...config, entity: config.entity || "-" });
 
 if (!customElements.get(CARD_TYPE)) {
   customElements.define(CARD_TYPE, LampsterCard);
