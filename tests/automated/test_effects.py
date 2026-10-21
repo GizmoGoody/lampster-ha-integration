@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import random
 
 import pytest
 
@@ -77,6 +78,28 @@ def test_spin_alternating_changes_direction() -> None:
         # Each step moves the way the previous step's direction pointed
         expected = ccw_next if ((i - 1) // per_direction) % 2 == 0 else cw_next
         assert colors[i] == expected[colors[i - 1]], i
+
+
+def test_fireworks_bursts_are_spaced() -> None:
+    """Fireworks bursts start at least 0.9 s apart and use firework colors."""
+    random.seed(1)
+    now, last_start, previous_dark, starts = 0.0, None, True, 0
+    for step in itertools.islice(effect_steps("fireworks", 255, None), 5000):
+        values = color_values(step.color)
+        bright = max(values) > 50
+        if bright and previous_dark:
+            if last_start is not None:
+                assert now - last_start >= 0.9 - 1e-9
+            last_start = now
+            starts += 1
+            # A burst starts at full in one of the firework colors
+            assert any(
+                all(abs(v - c * max(values) / 100) <= 1 for v, c in zip(values, color))
+                for color in effects.FIREWORKS_COLORS
+            )
+        previous_dark = max(values) == 0
+        now += step.delay
+    assert starts > 100
 
 
 def test_effect_modes() -> None:

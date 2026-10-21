@@ -8,7 +8,7 @@ Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model
 - ✅ **RGB Color Control** - Full RGB color picker support
 - ✅ **Color Temperature** - Warm to cool white (2700K - 6500K)
 - ✅ **Favorite Colors** - Red, green, blue, white, cyan, magenta, yellow and ten common white temperatures added to the color picker (appended to your own favorites; each is added only once, so removed ones stay removed)
-- ✅ **Effects** - Color Loop, Random, Candle, Fireplace, Breathe and Spin, from the light card
+- ✅ **Effects** - Color Loop, Random, Candle, Fireplace, Breathe, Spin and Fireworks, from the light card
 - ✅ **Transitions** - Fade on, off or between colors over any number of seconds
 - ✅ **Diagnostics and repairs** - Downloadable diagnostics, and a repair notice when The Lampster cannot be reached
 - ✅ **Brightness Control** - Adjust light intensity
@@ -108,6 +108,7 @@ Effects are chosen from the light card or with `light.turn_on`:
 | Breathe | The current color slowly brightens and dims |
 | Spin CW, Spin CCW | The ring of LEDs appears to turn clockwise or counterclockwise. Each LED has its red, blue and green parts side by side, so lighting them one after another moves the light around the ring; the color changes as it turns |
 | Spin Alternating | Spins one way, then the other, changing direction every 4 seconds |
+| Fireworks | Bursts of red, orange, gold, green, blue, purple and white that flash on and fade out between dark pauses, sometimes two or three in a row. At most about one burst a second |
 
 The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or tapping or holding the touch button stops an effect or fade, whether it runs in white or in color. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
 

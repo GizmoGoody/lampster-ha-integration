@@ -62,7 +62,8 @@
               "breathe": "Breathe",
               "spin_cw": "Spin CW",
               "spin_ccw": "Spin CCW",
-              "spin_alternating": "Spin Alternating"
+              "spin_alternating": "Spin Alternating",
+              "fireworks": "Fireworks"
             }
           }
         }
