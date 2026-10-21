@@ -205,6 +205,7 @@ Protocol based on reverse engineering by [Noki](https://github.com/Noki/the-lamp
 - Because both LEDs change by the same amount, the color shifts during a hold: brightening pulls the color toward the middle (about 4600 K) and dimming pushes it back toward the end it started from. For example, warm white at warm 50 / cold 1 (about 2770 K) brightens to warm 100 / cold 51 (about 4000 K), and cool white at warm 0 / cold 53 brightens to warm 48 / cold 100 (about 5300 K). Home Assistant shows this shift because it is what The Lampster is doing
 - An LED that reaches zero while dimming stays at zero while the other keeps dimming, so dimming all the way down and back up with the touch button ends near 4600 K whatever color temperature was set. At 1% there is no room left for a color temperature, so after dimming to 1% in Home Assistant the touch button brightens every white the same way
 - Brightness changes made from Home Assistant keep the warm/cold ratio, so the color temperature stays the same while dimming
+- Each LED has 101 levels, so a color temperature worked out from the LEDs can be off by up to about 130 K at low brightness. Home Assistant therefore shows the color temperature and brightness exactly as requested, for as long as The Lampster still shows them; after a touch-button change, it shows the values worked out from the LEDs
 
 ### Connection Handling
 
