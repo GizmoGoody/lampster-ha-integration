@@ -13,7 +13,7 @@
  *
  * Every tile card option works the same way here. The card's own options:
  *   style, paint_color, head_color, pattern, features_style, fasteners,
- *   fastener_color, fastener_spacing, single_row_fasteners
+ *   fastener_color, fastener_spacing
  *
  * Style "none" keeps the tile card's own look from the theme and adds only
  * the head (in head_color) and the fasteners.
@@ -59,12 +59,21 @@ const RANDOMIZED = (style) =>
 // "match" is written out and labeled "Match style" wherever it is offered
 const MATCH = ["match", "Match style"];
 const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["channel", "Channel"]];
-// On a single-row card: fasteners in the corners, or one at each end
-const SINGLE_ROW_FASTENERS = [["corners", "Corners"], ["ends", "Ends"]];
 
 const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"], ["socket", "Socket"], ["none", "None"]];
-// Fastener spacing: the number is how many gaps each long edge is divided into
-const SPACINGS = [[0, "Corners"], [2, "1/2"], [4, "1/4"], [8, "1/8"], [16, "1/16"], [32, "1/32"], [64, "1/64"]];
+/**
+ * Fastener spacing: the number is how many gaps each long edge is divided
+ * into (0 is corners only). An E after it (such as 4E) puts one fastener at
+ * each end of a single-row card instead of in its corners.
+ */
+const GAPS = [[0, "Corners"], [2, "1/2"], [4, "1/4"], [8, "1/8"], [16, "1/16"], [32, "1/32"], [64, "1/64"]];
+const SPACINGS = GAPS.flatMap(([n, label]) => [[n, label], [`${n}E`, n ? `${label} + ends` : "Ends"]]);
+function parseSpacing(value) {
+  const m = String(value).trim().match(/^(\d+)\s*(E?)$/i);
+  const gaps = m ? Number(m[1]) : NaN;
+  if (!GAPS.some(([n]) => n === gaps)) return null;
+  return { gaps, ends: Boolean(m[2]), value: m[2] ? `${gaps}E` : gaps };
+}
 
 const DEFAULTS = {
   style: "polished",
@@ -74,7 +83,6 @@ const DEFAULTS = {
   fastener_color: "match",
   fastener_spacing: 4,
   features_style: "match",
-  single_row_fasteners: "corners",
 };
 const DEFAULT_PATTERN = 17;
 // The card's own options; everything else belongs to the tile card
@@ -85,14 +93,13 @@ function validate(config) {
   const c = { ...DEFAULTS, ...config };
   if (!STYLES[c.style]) throw new Error(`Unknown style: ${c.style}`);
   if (!FASTENERS.some(([id]) => id === c.fasteners)) throw new Error(`Unknown fasteners: ${c.fasteners}`);
-  c.fastener_spacing = Number(c.fastener_spacing);
-  if (!SPACINGS.some(([n]) => n === c.fastener_spacing)) {
-    throw new Error(`fastener_spacing must be one of ${SPACINGS.map(([n]) => n).join(", ")}`);
+  const spacing = parseSpacing(c.fastener_spacing);
+  if (!spacing) {
+    throw new Error(`fastener_spacing must be one of ${GAPS.map(([n]) => n).join(", ")}, optionally followed by E (such as 4E)`);
   }
-  for (const [key, options] of [["features_style", FEATURES_STYLES], ["single_row_fasteners", SINGLE_ROW_FASTENERS]]) {
-    if (!options.some(([id]) => id === c[key])) {
-      throw new Error(`${key} must be one of ${options.map(([id]) => id).join(", ")}`);
-    }
+  c.fastener_spacing = spacing.value;
+  if (!FEATURES_STYLES.some(([id]) => id === c.features_style)) {
+    throw new Error(`features_style must be one of ${FEATURES_STYLES.map(([id]) => id).join(", ")}`);
   }
   if (c.pattern !== undefined) c.pattern = Math.abs(Math.round(Number(c.pattern))) || DEFAULT_PATTERN;
   return c;
@@ -424,30 +431,38 @@ function findDeep(el, selector, depth = 5) {
   return found;
 }
 
-// The corner radius of a feature's control: the first element inside it,
-// about the feature's size, with rounded corners
+// A corner radius as drawn: CSS limits it to half the shorter side, so a
+// theme's "pill" radius (such as 9999px) draws as a half circle
+const drawnRadius = (radius, w, h) => Math.max(0, Math.min(radius, w / 2, h / 2));
+
+// The corner radius of a feature's control, as drawn: the roundest element
+// inside it (through its shadow roots) that is about the feature's size
 function controlRadius(feature, b) {
-  const stack = [feature];
+  let found = 0;
+  let stack = [feature];
   for (let depth = 0; depth < 6 && stack.length; depth++) {
     const next = [];
     for (const el of stack) {
       for (const child of el.shadowRoot ? el.shadowRoot.querySelectorAll("*") : []) {
         const r = child.getBoundingClientRect();
-        const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius);
-        if (radius > 0 && Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) return radius;
+        if (Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) {
+          const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius) || 0;
+          found = Math.max(found, drawnRadius(radius, r.width, r.height));
+        }
         if (child.shadowRoot) next.push(child);
       }
     }
-    stack.splice(0, stack.length, ...next);
+    stack = next;
   }
-  return 12;
+  return found || drawnRadius(12, b.w, b.h);
 }
 
 /**
- * The slider in a channel: the unused part shows the channel's floor, the
- * used part is a textured bar, and the handle is a raised grip. This styles
- * parts inside Home Assistant's slider; if an update renames them, the
- * slider simply keeps its usual look.
+ * The slider in a channel: the unused part shows the channel's floor, and
+ * the used part looks like a slatted roll-up door sliding along it, with no
+ * handle. The slider's shape is not changed, and the channel around it is
+ * concentric with it. This styles parts inside Home Assistant's slider; if
+ * an update renames them, the slider simply keeps its usual look.
  */
 let sliderSheet;
 function styleSlider(slider, on) {
@@ -459,21 +474,13 @@ function styleSlider(slider, on) {
       :host([lampster-channel]) .slider .slider-track-background { opacity: 0; }
       :host([lampster-channel]) .slider .slider-track-bar {
         background-image:
-          repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 1px, rgba(0,0,0,.14) 1px 2px, rgba(0,0,0,0) 2px 4px),
-          linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 45%, rgba(0,0,0,.28));
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.3), 1px 0 3px rgba(0,0,0,.45);
+          repeating-linear-gradient(90deg,
+            rgba(255,255,255,.28) 0, rgba(255,255,255,.08) 4px, rgba(0,0,0,.12) 8px,
+            rgba(0,0,0,.6) 8px, rgba(0,0,0,.6) 10px),
+          linear-gradient(180deg, rgba(255,255,255,.3), rgba(255,255,255,0) 40%, rgba(0,0,0,.3));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.35);
       }
-      :host([lampster-channel]) .slider .slider-track-bar::after {
-        width: 10px; height: 70%; border-radius: 3px;
-        background-color: #c9ced3;
-        background-image:
-          repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 1px, rgba(255,255,255,.5) 1px 2px, rgba(0,0,0,0) 2px 3px),
-          linear-gradient(180deg, #f1f3f5, #aab1b8);
-        background-size: 6px 60%, 100% 100%;
-        background-position: center, center;
-        background-repeat: no-repeat;
-        box-shadow: 0 1px 2px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(0,0,0,.25);
-      }
+      :host([lampster-channel]) .slider .slider-track-bar::after { display: none; }
     `);
   }
   if (!root.adoptedStyleSheets.includes(sliderSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, sliderSheet];
@@ -704,7 +711,7 @@ class LampsterCard extends HTMLElement {
     this._frame.classList.toggle("styled", !look.theme);
     const pad = featuresStyle === "channel" ? 3 : 0;
     const areas = featuresStyle === "match" ? [] : controls.features.map((b) =>
-      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: Math.min(b.radius + pad, (b.h + 2 * pad) / 2) }));
+      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: drawnRadius(b.radius + pad, b.w + 2 * pad, b.h + 2 * pad) }));
     let texture = look.svg;
     if (areas.length && texture) {
       const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
@@ -725,20 +732,21 @@ class LampsterCard extends HTMLElement {
 
     // Fasteners: smaller on a single-row card; any along the edges that would
     // touch the icon or the controls are left out (the corners or ends stay)
-    const { fasteners, fastener_spacing: spacing } = this._config;
+    const { fasteners } = this._config;
+    const { gaps: spacing, ends: atEnds } = parseSpacing(this._config.fastener_spacing);
     let markup = "";
     if (fasteners !== "none") {
       const compact = H < 80;  // a single row
       const inset = compact ? 5 : 7;
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
-      const radius = parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12;
+      const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
       const avoid = [...controls.icon, ...controls.features];
       const clear = (x, y) => avoid.every((b) => {
         const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
         return Math.hypot(x - nx, y - ny) > size / 2 + (compact ? 0.5 : 1.5);
       });
-      const ends = compact && this._config.single_row_fasteners === "ends";
+      const ends = compact && atEnds;
       const { points, fixed } = fastenerPositions(spacing, W, H, radius, inset, ends);
       markup = `<defs>${fastenerSymbols(p)}</defs>` +
         points
@@ -808,10 +816,7 @@ const LABELS = {
   fastener_color: "Fastener color",
   fastener_spacing: "Fastener spacing",
   features_style: "Features style",
-  single_row_fasteners: "Single-row fasteners",
 };
-
-const COLOR_HELP = "Pick a theme color from the list, or type any CSS color, such as #1f6f78, rgb(31, 111, 120) or a color name like goldenrod, and select Custom color";
 
 // A small picture of each fastener for the Fasteners choice
 function fastenerPicture(kind) {
@@ -877,7 +882,6 @@ class LampsterCardEditor extends HTMLElement {
     this._forms = ["look", "controls", "fasteners"].map((id) => this.shadowRoot.getElementById(id));
     for (const form of this._forms) {
       form.computeLabel = (schema) => LABELS[schema.name] ?? schema.name;
-      form.computeHelper = (schema) => (schema.selector?.ui_color ? COLOR_HELP : undefined);
       form.addEventListener("value-changed", (ev) => this._formChanged(ev));
     }
     // Fasteners: a picture of each, chosen like radio buttons
@@ -983,10 +987,9 @@ class LampsterCardEditor extends HTMLElement {
       {
         type: "grid", name: "", schema: [
           { name: "fastener_spacing", selector: select(SPACINGS) },
-          { name: "single_row_fasteners", selector: select(SINGLE_ROW_FASTENERS) },
+          { name: "fastener_color", selector: { ui_color: { extra_options: [{ value: MATCH[0], label: MATCH[1] }] } } },
         ],
       },
-      { name: "fastener_color", selector: { ui_color: { extra_options: [{ value: MATCH[0], label: MATCH[1] }] } } },
     ];
     const data = { ...c, collection: collection.id, fastener_spacing: String(c.fastener_spacing) };
     for (const form of this._forms) form.data = data;
@@ -1012,7 +1015,7 @@ class LampsterCardEditor extends HTMLElement {
     const changes = {};
     for (const key of Object.keys(DEFAULTS)) {
       if (!(key in value)) continue;
-      const next = key === "fastener_spacing" ? Number(value[key]) : value[key];
+      const next = key === "fastener_spacing" ? parseSpacing(value[key])?.value : value[key];
       if (JSON.stringify(next) !== JSON.stringify(c[key])) changes[key] = next;
     }
     if (Object.keys(changes).length) this._update(changes);
@@ -1041,7 +1044,7 @@ function explicit(config) {
   if (style === "painted") keys.push("paint_color");
   if (style === "none") keys.push("head_color");
   else keys.push("features_style");
-  if ((c.fasteners ?? DEFAULTS.fasteners) !== "none") keys.push("fastener_color", "fastener_spacing", "single_row_fasteners");
+  if ((c.fasteners ?? DEFAULTS.fasteners) !== "none") keys.push("fastener_color", "fastener_spacing");
   for (const key of keys) if (c[key] === undefined) c[key] = DEFAULTS[key];
   return c;
 }
@@ -1054,7 +1057,7 @@ function validateForEditor(config) {
     const c = { ...DEFAULTS, ...config };
     if (!STYLES[c.style]) c.style = DEFAULTS.style;
     if (!FASTENERS.some(([id]) => id === c.fasteners)) c.fasteners = DEFAULTS.fasteners;
-    if (!SPACINGS.some(([n]) => n === Number(c.fastener_spacing))) c.fastener_spacing = DEFAULTS.fastener_spacing;
+    c.fastener_spacing = parseSpacing(c.fastener_spacing)?.value ?? DEFAULTS.fastener_spacing;
     return c;
   }
 }
