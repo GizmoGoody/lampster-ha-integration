@@ -54,7 +54,7 @@
       }
     },
     "number": {
-      "effect_speed": {
+      "effects_speed": {
         "default": "mdi:speedometer"
       }
     }

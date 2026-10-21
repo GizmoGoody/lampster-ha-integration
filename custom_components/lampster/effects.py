@@ -92,7 +92,7 @@ PURSUIT_COLORS = ((100, 0, 0), (0, 0, 100))
 PURSUIT_STEPS = ((0.5, 0.1), (1.0, 0.3), (0.5, 0.1))  # (level, seconds)
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
-# Effect speed, in percent of normal. Faster than 200% would push effects past
+# Effects speed, in percent of normal. Faster than 200% would push effects past
 # what the Bluetooth connection keeps up with and past a comfortable flash rate
 EFFECT_SPEED_MIN = 25
 EFFECT_SPEED_MAX = 200
