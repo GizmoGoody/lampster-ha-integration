@@ -11,8 +11,11 @@
  *   color fills the lens. The picture is built in memory; no files are written.
  *
  * Every tile card option works the same way here. The card's own options:
- *   style, paint_color, pattern, controls_style, fasteners,
+ *   style, paint_color, head_color, pattern, controls_style, fasteners,
  *   fastener_color, fastener_spacing
+ *
+ * Style "none" keeps the tile card's own look from the theme and adds only
+ * the head (in head_color) and the fasteners.
  */
 
 const CARD_TYPE = "lampster-card";
@@ -35,6 +38,7 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 // Styles, grouped like the collections in The Lampster's shop
 const COLLECTIONS = [
+  { id: "none", name: "None", styles: [["none", "None"]] },
   { id: "metal", name: "Metal", styles: [
     ["polished", "Polished Aluminum"], ["brushed", "Brushed Aluminum"],
     ["rusted", "Rusted Steel"], ["painted", "Painted"],
@@ -60,6 +64,7 @@ const SPACINGS = [[0, "Corners"], [2, "1/2"], [4, "1/4"], [8, "1/8"], [16, "1/16
 const DEFAULTS = {
   style: "polished",
   paint_color: "teal",
+  head_color: "light-grey",
   fasteners: "rivets",
   fastener_color: "match",
   fastener_spacing: 4,
@@ -221,6 +226,10 @@ function drawStyle(config, paint, p, W, H) {
   const seed = config.pattern ?? DEFAULT_PATTERN;
   const rect = (attrs) => `<rect width="100%" height="100%" ${attrs}/>`;
   const tone = (color) => (luma(color) > 0.6 ? "light" : "dark");
+  if (style === "none") {
+    // The theme's own tile card: only the head and the fasteners are drawn
+    return { bg: "none", svg: "", housing: paint, metal: paint, tone: null, theme: true };
+  }
   if (style === "polished") {
     return {
       bg: polishedBackground(config.pattern),
@@ -411,8 +420,9 @@ class LampsterCard extends HTMLElement {
         .frame {
           position: relative; height: 100%; box-sizing: border-box; overflow: hidden; isolation: isolate;
           border-radius: var(--ha-card-border-radius, 12px);
-          box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 10px rgba(0, 0, 0, .3);
         }
+        .frame.styled { box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 10px rgba(0, 0, 0, .3); }
+        .frame:not(.styled) #bevel { display: none; }
         .layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
         /* A slightly raised panel: lit top and left edges, shaded bottom and right */
         #bevel {
@@ -422,11 +432,10 @@ class LampsterCard extends HTMLElement {
             inset 0 -1px 0 rgba(0, 0, 0, .45), inset -1px 0 0 rgba(0, 0, 0, .3),
             inset 3px 3px 4px -1px rgba(255, 255, 255, .22), inset -3px -3px 5px -1px rgba(0, 0, 0, .3);
         }
-        .tile {
-          position: relative; display: block; height: 100%;
+        .tile { position: relative; display: block; height: 100%; --ha-tile-icon-border-radius: 0; }
+        .styled .tile {
           --ha-card-background: transparent; --card-background-color: transparent;
           --ha-card-box-shadow: none; --ha-card-border-width: 0; --ha-card-border-color: transparent;
-          --ha-tile-icon-border-radius: 0;
         }
         .tile.light { --primary-text-color: #1d2126; --secondary-text-color: #3c434b; text-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
         .tile.dark { --primary-text-color: #f4f4f4; --secondary-text-color: #dadada; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
@@ -592,14 +601,17 @@ class LampsterCard extends HTMLElement {
     const W = this._frame.clientWidth, H = this._frame.clientHeight;
     if (!W || !H) return;
     const p = this._prefix;
-    const paint = resolveColor(this._config.paint_color, this, "#1f6f78");
+    const paint = this._config.style === "none"
+      ? resolveColor(this._config.head_color, this, "#bdbdbd")
+      : resolveColor(this._config.paint_color, this, "#1f6f78");
     const look = drawStyle(this._config, paint, p, W, H);
     const controls = this._controls();
     const root = this.shadowRoot;
 
     // The controls: on the style itself, on a flat patch of the style's base
     // (no rust, wear or splatter), or in a channel pressed into the panel
-    const controlsStyle = this._config.controls_style;
+    const controlsStyle = look.theme ? "match" : this._config.controls_style;
+    this._frame.classList.toggle("styled", !look.theme);
     const pad = controlsStyle === "inset" ? 3 : 0;
     const areas = controlsStyle === "match" ? [] : controls.features.map((b) => ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }));
     let texture = look.svg;
@@ -696,6 +708,7 @@ const LABELS = {
   collection: "Collection",
   style: "Style",
   paint_color: "Paint color",
+  head_color: "Head color",
   fasteners: "Fasteners",
   fastener_color: "Fastener color",
   fastener_spacing: "Fastener spacing",
@@ -742,7 +755,7 @@ class LampsterCardEditor extends HTMLElement {
         <div slot="header" role="heading" aria-level="3">The Lampster Style</div>
         <div class="content">
           <ha-form id="look"></ha-form>
-          <div class="row">
+          <div class="row" id="row">
             <ha-button id="randomize"></ha-button>
             <ha-form id="controls"></ha-form>
           </div>
@@ -812,15 +825,17 @@ class LampsterCardEditor extends HTMLElement {
     const c = validateForEditor(this._config);
     const collection = COLLECTIONS.find((g) => g.id === (this._collection ?? collectionOf(c.style)));
     const [look, controls, fasteners] = this._forms;
+    const none = c.style === "none";
+    const collectionField = { name: "collection", selector: select(COLLECTIONS.map((g) => [g.id, g.name])) };
     look.schema = [
-      {
-        type: "grid", name: "", schema: [
-          { name: "collection", selector: select(COLLECTIONS.map((g) => [g.id, g.name])) },
-          { name: "style", selector: select(collection.styles) },
-        ],
-      },
+      none
+        // The theme's own tile: only the head's color to choose
+        ? { type: "grid", name: "", schema: [collectionField, { name: "head_color", selector: { ui_color: { default_color: DEFAULTS.head_color } } }] }
+        : { type: "grid", name: "", schema: [collectionField, { name: "style", selector: select(collection.styles) }] },
       ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: { default_color: DEFAULTS.paint_color } } }] : []),
     ];
+    // Randomize and Controls style do not apply to the theme's own tile
+    this.shadowRoot.getElementById("row").style.display = none ? "none" : "";
     controls.schema = [{ name: "controls_style", selector: select(CONTROLS_STYLES) }];
     fasteners.schema = [
       {
