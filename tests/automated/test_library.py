@@ -95,6 +95,45 @@ async def test_mode_write_gives_up(lamp: FakeLamp, monkeypatch: pytest.MonkeyPat
         await client._write_mode(0xA8)
 
 
+async def test_power_off_keeps_mode_and_levels(lamp: FakeLamp) -> None:
+    """Power off clears only the power bit, like the touch button.
+
+    The levels are kept, so a tap brings back the same mode and levels.
+    """
+    for on, off in ((0xC8, 0x48), (0xA8, 0x28)):
+        lamp.mode = on
+        lamp.white = bytes([35, 2])
+        client = _client(lamp)
+        await client.refresh_state()
+        await client.power_off()
+        assert lamp.mode == off
+        assert lamp.white == bytes([35, 2])
+        assert not client.state.is_on
+
+
+async def test_power_off_falls_back_to_zeroed(
+    lamp: FakeLamp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the lamp rejects the button-style off, the zeroing sequence is used."""
+    monkeypatch.setattr(client_module, "MODE_WRITE_RETRY_DELAY", 0)
+    lamp.mode = 0xA8
+    client = _client(lamp)
+    await client.refresh_state()
+    fake = client._client
+    original = fake.write_gatt_char
+
+    async def rejects_28(char: str, data: bytes, response: bool = False) -> None:
+        if char.startswith(MODE) and data[0] == 0x28:
+            raise RuntimeError("Write Not Permitted")
+        await original(char, data, response)
+
+    fake.write_gatt_char = rejects_28
+    await client.power_off()
+    assert lamp.mode == 0x40
+    assert lamp.white == bytes([0, 0])
+    assert not client.state.is_on
+
+
 async def test_notifications_update_state(lamp: FakeLamp) -> None:
     """Pushed MODE/WHITE changes update the state and call back."""
     lamp.mode = 0xC8
