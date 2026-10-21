@@ -29,8 +29,9 @@
     const written = events.at(-1) ?? {};
     check(written.style === "polished", `style written out (${written.style})`);
     check(written.features_style === "match", `features_style written out as match (${written.features_style})`);
-    check(written.fastener_color === "match", `fastener_color written out as match (${written.fastener_color})`);
-    check(written.fastener_spacing === 4, `fastener_spacing written out (${written.fastener_spacing})`);
+    check(JSON.stringify(written.fasteners) === JSON.stringify({ type: "rivets", color: "match", spacing: 4 }),
+      `fasteners written out as a group with color match (${JSON.stringify(written.fasteners)})`);
+    check(!("paint_color" in written) && !("pattern" in written), "no paint_color or pattern for Polished Aluminum until set");
 
     // The tile card's editor is used, without Icon and Show entity picture
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -39,18 +40,48 @@
     const names = tileEditor?.schemaNames ?? "";
     check(!names.includes('"icon"') && !names.includes('"show_entity_picture"'), "Icon and Show entity picture are left out");
     check(names.includes('"color"') && names.includes('"hide_state"'), "the other tile card options stay");
-    check(!("show_entity_picture" in (tileEditor?.config ?? {})) || tileEditor.config.show_entity_picture === true, "the head stays on");
+    const tileKeys = Object.keys(tileEditor?.config ?? {});
+    check(!tileKeys.some((k) => ["style", "paint_color", "pattern", "features_style", "fasteners", "fastener_spacing"].includes(k)),
+      `the tile card's editor gets only tile card options (${tileKeys.join(", ")})`);
 
     // A spacing with an E (YAML only) shows as the fraction and keeps its E
     events.length = 0;
-    editor.setConfig({ ...written, fastener_spacing: "8E" });
+    editor.setConfig({ ...written, fasteners: { ...written.fasteners, spacing: "8E" } });
     const form = editor.shadowRoot.getElementById("fasteners");
     check(form.data?.fastener_spacing === "8", `8E shows as 1/8 in the editor (${form.data?.fastener_spacing})`);
     form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, fastener_spacing: "16" } } }));
-    check(events.at(-1)?.fastener_spacing === "16E", `changing the spacing keeps the E (${events.at(-1)?.fastener_spacing})`);
+    check(events.at(-1)?.fasteners?.spacing === "16E", `changing the spacing keeps the E (${events.at(-1)?.fasteners?.spacing})`);
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, fastener_color: "amber" } } }));
+    check(events.at(-1)?.fasteners?.color === "amber", `the fastener color goes into the fasteners group (${events.at(-1)?.fasteners?.color})`);
+
+    // Choosing a fastener picture sets fasteners.type; None leaves only the type
+    editor.shadowRoot.querySelector('#fastenerChoices [data-value="none"]').click();
+    check(JSON.stringify(events.at(-1)?.fasteners) === JSON.stringify({ type: "none" }), `fasteners none keeps only the type (${JSON.stringify(events.at(-1)?.fasteners)})`);
+    editor.shadowRoot.querySelector('#fastenerChoices [data-value="hex"]').click();
+    check(events.at(-1)?.fasteners?.type === "hex" && events.at(-1)?.fasteners?.spacing === 4, "a fastener type after None gets the default spacing");
+
+    // Switching styles removes the options the new style does not use
+    const look = editor.shadowRoot.getElementById("look");
+    editor.setConfig({ ...events.at(-1), style: "rusted", pattern: 4242, features_style: "inset" });
+    look.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...look.data, collection: "none" } } }));
+    let now = events.at(-1);
+    check(now.style === "none" && !("pattern" in now) && !("features_style" in now), `None drops pattern and features_style (${Object.keys(now).join(", ")})`);
+    check(now.paint_color === "light-grey", `None gets a head color (${now.paint_color})`);
+    editor.setConfig({ ...now, style: "painted", features_style: "flat" });
+    now = events.at(-1) ?? now;
+    look.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...look.data, style: "brushed" } } }));
+    now = events.at(-1);
+    check(now.style === "brushed" && !("paint_color" in now) && !("pattern" in now), `Brushed Aluminum drops paint_color and pattern (${Object.keys(now).join(", ")})`);
+
+    // Options of earlier versions are removed
+    events.length = 0;
+    editor.setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", style: "none", head_color: "red", fastener_color: "red", fastener_spacing: 32, controls_style: "inset" });
+    now = events.at(-1) ?? {};
+    check(!["head_color", "fastener_color", "fastener_spacing", "controls_style"].some((k) => k in now), `options of earlier versions are removed (${Object.keys(now).join(", ")})`);
 
     // Invalid settings show a clear error on the card
-    for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fastener_spacing: 3 }, "fastener_spacing"], [{ features_style: "channel" }, "features_style"]]) {
+    for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fasteners: { spacing: 3 } }, "spacing"],
+      [{ fasteners: { type: "nails" } }, "type"], [{ fasteners: "rivets" }, "group"], [{ features_style: "channel" }, "features_style"]]) {
       try {
         document.createElement("lampster-card").setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", ...bad });
         check(false, `no error for ${JSON.stringify(bad)}`);

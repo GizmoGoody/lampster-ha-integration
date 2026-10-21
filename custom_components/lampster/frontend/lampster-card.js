@@ -12,11 +12,11 @@
  *   color fills the lens. The picture is built in memory; no files are written.
  *
  * Every tile card option works the same way here. The card's own options:
- *   style, paint_color, head_color, pattern, features_style, fasteners,
- *   fastener_color, fastener_spacing
+ *   style, paint_color, pattern, features_style, and
+ *   fasteners: { type, color, spacing }
  *
  * Style "none" keeps the tile card's own look from the theme and adds only
- * the head (in head_color) and the fasteners.
+ * the head (in paint_color) and the fasteners.
  */
 
 const CARD_TYPE = "lampster-card";
@@ -77,30 +77,40 @@ function parseSpacing(value) {
 
 const DEFAULTS = {
   style: "polished",
-  paint_color: "teal",
-  head_color: "light-grey",
-  fasteners: "rivets",
-  fastener_color: "match",
-  fastener_spacing: 4,
   features_style: "match",
 };
+// paint_color: the paint of Painted (panel and head), or of None's head
+const DEFAULT_PAINT = { painted: "teal", none: "light-grey" };
+const FASTENER_DEFAULTS = { type: "rivets", color: "match", spacing: 4 };
 const DEFAULT_PATTERN = 17;
 // The card's own options; everything else belongs to the tile card
-const OWN_KEYS = [...Object.keys(DEFAULTS), "pattern"];
+const OWN_KEYS = ["style", "paint_color", "pattern", "features_style", "fasteners"];
+// Options of earlier versions of the card: never passed on to the tile card
+// (its editor would refuse them), and removed by the editor
+const RETIRED_KEYS = ["head_color", "fastener_color", "fastener_spacing", "single_row_fasteners", "controls_style", "clear_controls"];
+const usesPaint = (style) => style === "painted" || style === "none";
 
 function validate(config) {
   if (!config.entity) throw new Error("Specify an entity");
   const c = { ...DEFAULTS, ...config };
   if (!STYLES[c.style]) throw new Error(`Unknown style: ${c.style}`);
-  if (!FASTENERS.some(([id]) => id === c.fasteners)) throw new Error(`Unknown fasteners: ${c.fasteners}`);
-  const spacing = parseSpacing(c.fastener_spacing);
-  if (!spacing) {
-    throw new Error(`fastener_spacing must be one of ${GAPS.map(([n]) => n).join(", ")}, optionally followed by E (such as 4E)`);
-  }
-  c.fastener_spacing = spacing.value;
+  if (usesPaint(c.style)) c.paint_color ??= DEFAULT_PAINT[c.style];
   if (!FEATURES_STYLES.some(([id]) => id === c.features_style)) {
     throw new Error(`features_style must be one of ${FEATURES_STYLES.map(([id]) => id).join(", ")}`);
   }
+  const fasteners = config.fasteners ?? {};
+  if (typeof fasteners !== "object" || Array.isArray(fasteners)) {
+    throw new Error("fasteners must be a group of options: type, color and spacing (such as type: rivets)");
+  }
+  c.fasteners = { ...FASTENER_DEFAULTS, ...fasteners };
+  if (!FASTENERS.some(([id]) => id === c.fasteners.type)) {
+    throw new Error(`fasteners type must be one of ${FASTENERS.map(([id]) => id).join(", ")}`);
+  }
+  const spacing = parseSpacing(c.fasteners.spacing);
+  if (!spacing) {
+    throw new Error(`fasteners spacing must be one of ${GAPS.map(([n]) => n).join(", ")}, optionally followed by E (such as 4E)`);
+  }
+  c.fasteners.spacing = spacing.value;
   if (c.pattern !== undefined) c.pattern = Math.abs(Math.round(Number(c.pattern))) || DEFAULT_PATTERN;
   return c;
 }
@@ -108,7 +118,7 @@ function validate(config) {
 // The tile card's part of the configuration
 function tileConfig(config) {
   const tile = { ...config, type: "tile", show_entity_picture: true };
-  for (const key of OWN_KEYS) delete tile[key];
+  for (const key of [...OWN_KEYS, ...RETIRED_KEYS]) delete tile[key];
   return tile;
 }
 
@@ -865,9 +875,7 @@ class LampsterCard extends HTMLElement {
     const W = this._frame.clientWidth, H = this._frame.clientHeight;
     if (!W || !H) return;
     const p = this._prefix;
-    const paint = this._config.style === "none"
-      ? resolveColor(this._config.head_color, this, "#bdbdbd")
-      : resolveColor(this._config.paint_color, this, "#1f6f78");
+    const paint = resolveColor(this._config.paint_color, this, this._config.style === "none" ? "#bdbdbd" : "#1f6f78");
     const look = drawStyle(this._config, paint, p, W, H);
     const controls = this._controls();
     this._settle(layoutSignature(controls));
@@ -914,15 +922,15 @@ class LampsterCard extends HTMLElement {
     }
 
     // Fasteners: smaller on a single-row card; none is ever left out
-    const { fasteners } = this._config;
-    const { gaps: spacing, ends: atEnds } = parseSpacing(this._config.fastener_spacing);
+    const { type: fasteners, color: fastenerColor } = this._config.fasteners;
+    const { gaps: spacing, ends: atEnds } = parseSpacing(this._config.fasteners.spacing);
     let markup = "";
     if (fasteners !== "none") {
       const compact = H < 80;  // a single row
       // An inset takes room around the features: move the fasteners outward
       const edge = (compact ? 5 : 7) - (inset ? 1.5 : 0);
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
-      const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
+      const color = fastenerColor === "match" ? look.metal : resolveColor(fastenerColor, this, look.metal);
       const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
       const points = fastenerPositions(spacing, W, H, radius, edge, compact && atEnds);
       markup = `<defs>${fastenerSymbols(p)}</defs>` +
@@ -987,8 +995,7 @@ const LABELS = {
   collection: "Collection",
   style: "Style",
   paint_color: "Paint color",
-  head_color: "Head color",
-  fasteners: "Fasteners",
+  // The fastener fields; they are saved under fasteners as color and spacing
   fastener_color: "Fastener color",
   fastener_spacing: "Fastener spacing",
   features_style: "Features style",
@@ -1057,7 +1064,7 @@ class LampsterCardEditor extends HTMLElement {
     this.shadowRoot.getElementById("icon").path = ICON;
     this._forms = ["look", "controls", "fasteners"].map((id) => this.shadowRoot.getElementById(id));
     for (const form of this._forms) {
-      form.computeLabel = (schema) => LABELS[schema.name] ?? schema.name;
+      form.computeLabel = (schema) => schema.label ?? LABELS[schema.name] ?? schema.name;
       form.addEventListener("value-changed", (ev) => this._formChanged(ev));
     }
     // Fasteners: a picture of each, chosen like radio buttons
@@ -1070,7 +1077,7 @@ class LampsterCardEditor extends HTMLElement {
       button.setAttribute("aria-label", label);
       button.dataset.value = value;
       button.innerHTML = `<img alt="" src="${fastenerPicture(value)}">`;
-      button.addEventListener("click", () => this._update({ fasteners: value }));
+      button.addEventListener("click", () => this._updateFasteners({ type: value }));
       choices.append(button);
     }
     choices.addEventListener("keydown", (ev) => {
@@ -1078,9 +1085,9 @@ class LampsterCardEditor extends HTMLElement {
       const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
       if (!step) return;
       ev.preventDefault();
-      const index = FASTENERS.findIndex(([value]) => value === validateForEditor(this._config).fasteners);
+      const index = FASTENERS.findIndex(([value]) => value === validateForEditor(this._config).fasteners.type);
       const [value] = FASTENERS[(index + step + FASTENERS.length) % FASTENERS.length];
-      this._update({ fasteners: value });
+      this._updateFasteners({ type: value });
       choices.querySelector(`[data-value="${value}"]`).focus();
     });
     this.shadowRoot.getElementById("randomize").addEventListener("click", () => {
@@ -1147,7 +1154,7 @@ class LampsterCardEditor extends HTMLElement {
     look.schema = [
       none
         // The theme's own tile: only the head's color to choose
-        ? { type: "grid", name: "", schema: [collectionField, { name: "head_color", selector: { ui_color: {} } }] }
+        ? { type: "grid", name: "", schema: [collectionField, { name: "paint_color", label: "Head color", selector: { ui_color: {} } }] }
         : { type: "grid", name: "", schema: [collectionField, { name: "style", selector: select(collection.styles) }] },
       ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: {} } }] : []),
     ];
@@ -1155,11 +1162,11 @@ class LampsterCardEditor extends HTMLElement {
     this.shadowRoot.getElementById("row").style.display = none ? "none" : "";
     controls.schema = [{ name: "features_style", selector: select(FEATURES_STYLES) }];
     for (const button of this.shadowRoot.querySelectorAll("#fastenerChoices button")) {
-      const checked = button.dataset.value === c.fasteners;
+      const checked = button.dataset.value === c.fasteners.type;
       button.setAttribute("aria-checked", String(checked));
       button.tabIndex = checked ? 0 : -1;
     }
-    fasteners.schema = c.fasteners === "none" ? [] : [
+    fasteners.schema = c.fasteners.type === "none" ? [] : [
       {
         type: "grid", name: "", schema: [
           { name: "fastener_spacing", selector: select(GAPS) },
@@ -1167,7 +1174,10 @@ class LampsterCardEditor extends HTMLElement {
         ],
       },
     ];
-    const data = { ...c, collection: collection.id, fastener_spacing: String(parseSpacing(c.fastener_spacing).gaps) };
+    const data = {
+      ...c, collection: collection.id,
+      fastener_color: c.fasteners.color, fastener_spacing: String(parseSpacing(c.fasteners.spacing).gaps),
+    };
     for (const form of this._forms) form.data = data;
 
     // Every style but Brushed Aluminum has something to randomize
@@ -1189,15 +1199,23 @@ class LampsterCardEditor extends HTMLElement {
     }
     this._collection = undefined;
     const changes = {};
-    for (const key of Object.keys(DEFAULTS)) {
-      if (!(key in value)) continue;
-      // The spacing keeps an E set in the YAML (ends on single-row cards)
-      const next = key === "fastener_spacing"
-        ? parseSpacing(`${value[key]}${parseSpacing(c.fastener_spacing).ends ? "E" : ""}`)?.value
-        : value[key];
-      if (JSON.stringify(next) !== JSON.stringify(c[key])) changes[key] = next;
+    for (const key of ["style", "paint_color", "features_style"]) {
+      if (key in value && JSON.stringify(value[key]) !== JSON.stringify(c[key])) changes[key] = value[key];
     }
+    // The fastener fields go into the fasteners group; the spacing keeps an
+    // E set in the YAML (ends on single-row cards)
+    const fasteners = {};
+    if ("fastener_color" in value && value.fastener_color !== c.fasteners.color) fasteners.color = value.fastener_color;
+    const spacing = parseSpacing(c.fasteners.spacing);
+    if ("fastener_spacing" in value && value.fastener_spacing !== String(spacing.gaps)) {
+      fasteners.spacing = parseSpacing(`${value.fastener_spacing}${spacing.ends ? "E" : ""}`)?.value;
+    }
+    if (Object.keys(fasteners).length) changes.fasteners = { ...this._config.fasteners, ...fasteners };
     if (Object.keys(changes).length) this._update(changes);
+  }
+
+  _updateFasteners(changes) {
+    this._update({ fasteners: { ...this._config.fasteners, ...changes } });
   }
 
   _update(changes) {
@@ -1212,19 +1230,30 @@ class LampsterCardEditor extends HTMLElement {
 }
 
 /**
- * The configuration with every option the chosen style uses written out,
- * defaults included (so "match" appears in the YAML); options a style does
- * not use (such as paint_color for anything but Painted) are left as they are.
+ * The configuration as the editor saves it: every option the chosen style
+ * uses written out, defaults included (so "match" appears in the YAML), and
+ * the options it does not use removed:
+ * - paint_color only for Painted and None,
+ * - pattern only for styles with something to randomize,
+ * - features_style for every style but None,
+ * - fasteners color and spacing unless the type is none,
+ * - options of earlier versions of the card.
  */
 function explicit(config) {
   const c = { ...config };
+  for (const key of RETIRED_KEYS) delete c[key];
   const style = STYLES[c.style] ? c.style : DEFAULTS.style;
-  const keys = ["style", "fasteners"];
-  if (style === "painted") keys.push("paint_color");
-  if (style === "none") keys.push("head_color");
-  else keys.push("features_style");
-  if ((c.fasteners ?? DEFAULTS.fasteners) !== "none") keys.push("fastener_color", "fastener_spacing");
-  for (const key of keys) if (c[key] === undefined) c[key] = DEFAULTS[key];
+  c.style = style;
+  if (usesPaint(style)) c.paint_color ??= DEFAULT_PAINT[style];
+  else delete c.paint_color;
+  if (!RANDOMIZED(style)) delete c.pattern;
+  if (style === "none") delete c.features_style;
+  else c.features_style ??= DEFAULTS.features_style;
+  const given = c.fasteners && typeof c.fasteners === "object" && !Array.isArray(c.fasteners) ? c.fasteners : {};
+  const type = given.type ?? FASTENER_DEFAULTS.type;
+  c.fasteners = type === "none"
+    ? { type }
+    : { type, color: given.color ?? FASTENER_DEFAULTS.color, spacing: given.spacing ?? FASTENER_DEFAULTS.spacing };
   return c;
 }
 
@@ -1233,10 +1262,11 @@ function validateForEditor(config) {
   try {
     return validate({ entity: "-", ...config });
   } catch (err) {
-    const c = { ...DEFAULTS, ...config };
-    if (!STYLES[c.style]) c.style = DEFAULTS.style;
-    if (!FASTENERS.some(([id]) => id === c.fasteners)) c.fasteners = DEFAULTS.fasteners;
-    c.fastener_spacing = parseSpacing(c.fastener_spacing)?.value ?? DEFAULTS.fastener_spacing;
+    const c = { ...DEFAULTS, ...explicit(config) };
+    if (!FEATURES_STYLES.some(([id]) => id === c.features_style)) c.features_style = DEFAULTS.features_style;
+    if (!FASTENERS.some(([id]) => id === c.fasteners.type)) c.fasteners.type = FASTENER_DEFAULTS.type;
+    c.fasteners.color ??= FASTENER_DEFAULTS.color;
+    c.fasteners.spacing = parseSpacing(c.fasteners.spacing ?? FASTENER_DEFAULTS.spacing)?.value ?? FASTENER_DEFAULTS.spacing;
     return c;
   }
 }

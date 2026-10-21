@@ -68,7 +68,7 @@ window.runChecks = (expectations = {}) => {
         const size = parseFloat(u.getAttribute("width"));
         return [parseFloat(u.getAttribute("x")) + size / 2, parseFloat(u.getAttribute("y")) + size / 2];
       });
-      if ((config.fasteners ?? "rivets") === "none") {
+      if ((config.fasteners?.type ?? "rivets") === "none") {
         check(title, uses.length === 0, "no fasteners");
       } else {
         check(title, uses.length > 0, `fasteners are drawn (${uses.length})`);
