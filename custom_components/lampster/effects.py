@@ -83,6 +83,13 @@ PURSUIT_COLORS = ((100, 0, 0), (0, 0, 100))
 PURSUIT_STEPS = ((0.5, 0.1), (1.0, 0.3), (0.5, 0.1))  # (level, seconds)
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
+# Effect speed, in percent of normal. Faster than 200% would push effects past
+# what the Bluetooth connection keeps up with and past a comfortable flash rate
+EFFECT_SPEED_MIN = 25
+EFFECT_SPEED_MAX = 200
+EFFECT_SPEED_DEFAULT = 100
+# Speeding up never makes a step shorter than this (or than it already was)
+EFFECT_MIN_STEP = 0.1
 
 Color = RGBColor | WhiteColor
 
@@ -224,6 +231,13 @@ def _fireworks(level: float) -> Iterator[Step]:
                 )
             if burst < bursts - 1:
                 yield Step(dark, FIREWORKS_FINALE_GAP)
+
+
+def scale_steps(steps: Iterator[Step], speed: int) -> Iterator[Step]:
+    """Run an effect's steps at a speed in percent of normal."""
+    factor = 100 / speed
+    for step in steps:
+        yield Step(step.color, max(min(step.delay, EFFECT_MIN_STEP), step.delay * factor))
 
 
 def _hue_color(hue: float, level: float) -> RGBColor:
