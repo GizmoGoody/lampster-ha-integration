@@ -592,13 +592,15 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             # Stop writing steps right away; the stop below waits for the task
             self._task_mode = None
             self.hass.async_create_task(self._async_stop_task())
+        # Store the report before reading the levels, so a read that finishes
+        # at once is not overwritten by this report's older levels
+        self._async_set_state(state, batch=True)
         if state.is_on and not same_mode:
             # The lamp reports only the new mode, not the levels it now shows.
             # Runs after the task stop above, which was scheduled first
             self.hass.async_create_background_task(
                 self._async_read_levels(), "lampster read levels"
             )
-        self._async_set_state(state, batch=True)
 
     @callback
     def _async_record_touch(self, state: LampState) -> None:
