@@ -3,20 +3,21 @@
  *
  * The card wraps Home Assistant's own tile card, so the layout, actions,
  * features and more-info dialog are exactly the tile card's. It only adds:
- * - a style (finish) drawn behind the tile card,
- * - fasteners drawn on top of it, and
+ * - a style (finish) drawn behind the tile card, with a raised edge,
+ * - fasteners drawn on top of it, clear of the icon and the controls, and
  * - a picture of The Lampster's head in place of the tile card's icon, shown
  *   through the tile card's own "show entity picture" option. The light's
  *   color fills the lens. The picture is built in memory; no files are written.
  *
  * Every tile card option works the same way here. The card's own options:
  *   style, paint_color, pattern, fasteners, fastener_color,
- *   fastener_custom_color, fastener_spacing
+ *   fastener_spacing, clear_controls
  */
 
 const CARD_TYPE = "lampster-card";
 const EDITOR_TYPE = "lampster-card-editor";
-const VERSION = "1.0.0";
+const TILE_EDITOR_TYPE = "lampster-tile-card-editor";
+const VERSION = "1.1.0";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -43,39 +44,39 @@ const COLLECTIONS = [
 ];
 const STYLES = Object.fromEntries(COLLECTIONS.flatMap((c) => c.styles));
 const collectionOf = (style) => COLLECTIONS.find((c) => c.styles.some(([id]) => id === style)).id;
-// Styles whose rust, wear or splatter is drawn from the pattern number
-const PATTERNED = (style) => style === "rusted" || /^(army|artsy)_/.test(style);
+// What the Randomize button redraws for a style, if anything
+const RANDOMIZED = (style) =>
+  style === "polished" ? "polish" : style === "rusted" ? "rust"
+    : style.startsWith("army_") ? "wear" : style.startsWith("artsy_") ? "splatter" : null;
 
 const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"], ["socket", "Socket"], ["none", "None"]];
-const FASTENER_COLORS = [["match", "Match"], ["custom", "Custom"]];
 // Fastener spacing: the number is how many gaps each long edge is divided into
 const SPACINGS = [[0, "Corners"], [2, "Half"], [4, "Quarter"], [8, "Eighth"], [16, "Sixteenth"], [32, "Thirty-second"], [64, "Sixty-fourth"]];
 
 const DEFAULTS = {
   style: "polished",
-  paint_color: [31, 111, 120],
-  pattern: 17,
+  paint_color: "teal",
   fasteners: "rivets",
   fastener_color: "match",
-  fastener_custom_color: [212, 175, 55],
   fastener_spacing: 4,
+  clear_controls: false,
 };
-const OWN_KEYS = Object.keys(DEFAULTS);
+const DEFAULT_PATTERN = 17;
+// The card's own options; everything else belongs to the tile card.
+// fastener_custom_color is read for cards saved by the first version.
+const OWN_KEYS = [...Object.keys(DEFAULTS), "pattern", "fastener_custom_color"];
 
 function validate(config) {
   if (!config.entity) throw new Error("Specify an entity");
   const c = { ...DEFAULTS, ...config };
   if (!STYLES[c.style]) throw new Error(`Unknown style: ${c.style}`);
   if (!FASTENERS.some(([id]) => id === c.fasteners)) throw new Error(`Unknown fasteners: ${c.fasteners}`);
-  if (!FASTENER_COLORS.some(([id]) => id === c.fastener_color)) throw new Error(`fastener_color must be match or custom`);
   c.fastener_spacing = Number(c.fastener_spacing);
   if (!SPACINGS.some(([n]) => n === c.fastener_spacing)) {
     throw new Error(`fastener_spacing must be one of ${SPACINGS.map(([n]) => n).join(", ")}`);
   }
-  for (const key of ["paint_color", "fastener_custom_color"]) {
-    if (!Array.isArray(c[key]) || c[key].length !== 3) throw new Error(`${key} must be [red, green, blue]`);
-  }
-  c.pattern = Math.abs(Math.round(Number(c.pattern))) || DEFAULTS.pattern;
+  if (c.fastener_color === "custom") c.fastener_color = c.fastener_custom_color ?? "match";
+  if (c.pattern !== undefined) c.pattern = Math.abs(Math.round(Number(c.pattern))) || DEFAULT_PATTERN;
   return c;
 }
 
@@ -87,7 +88,7 @@ function tileConfig(config) {
 }
 
 // ---------------------------------------------------------------------------
-// Drawing
+// Colors
 // ---------------------------------------------------------------------------
 
 const hex = (rgb) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -99,6 +100,33 @@ const luma = (color) => {
   const n = parseInt(color.slice(1), 16);
   return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 };
+
+/**
+ * A color from Home Assistant's color picker as #rrggbb: a theme color name
+ * (such as "teal"), any CSS color, or [red, green, blue].
+ */
+let canvas;
+function resolveColor(value, element, fallback) {
+  if (Array.isArray(value) && value.length === 3) return hex(value);
+  if (typeof value !== "string" || !value) return fallback;
+  let css = value;
+  if (/^[a-z-]+$/.test(value)) {
+    css = getComputedStyle(element).getPropertyValue(`--${value}-color`).trim() || value;
+  }
+  canvas ??= document.createElement("canvas").getContext("2d");
+  canvas.fillStyle = "#000001";
+  canvas.fillStyle = css;
+  const out = canvas.fillStyle;
+  if (out === "#000001") return fallback;
+  if (out.startsWith("#")) return out;
+  const rgb = out.match(/[\d.]+/g);
+  return rgb ? hex(rgb.slice(0, 3).map(Number)) : fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
+
 // Seeded random, so a pattern number always draws the same pattern
 const rng = (seed) => () => (seed = (seed * 16807 + 1) % 2147483647) / 2147483647;
 
@@ -106,21 +134,40 @@ const GLOSS = "linear-gradient(160deg, rgba(255,255,255,0) 12%, rgba(255,255,255
 const POLISH = "linear-gradient(115deg, rgba(255,255,255,0) 8%, rgba(255,255,255,.5) 42%, rgba(255,255,255,0) 76%)";
 const POLISH_SOFT = "linear-gradient(115deg, rgba(255,255,255,0) 8%, rgba(255,255,255,.28) 42%, rgba(255,255,255,0) 76%)";
 const ALUMINUM = "linear-gradient(180deg, #aeb3b7 0%, #92989d 45%, #a6abb0 70%, #868c92 100%)";
+const POLISHED_SHADING = "linear-gradient(180deg, rgba(255,255,255,.25) 0%, rgba(255,255,255,0) 35%, rgba(0,0,0,0) 70%, rgba(0,0,0,.25) 100%), linear-gradient(180deg, #9ea3a7, #8c9196)";
 const POLISHED = [
   "linear-gradient(100deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,0) 12%, rgba(255,255,255,.7) 27%, rgba(255,255,255,0) 42%, rgba(0,0,0,.32) 54%, rgba(0,0,0,0) 64%, rgba(255,255,255,.5) 77%, rgba(255,255,255,0) 90%, rgba(0,0,0,.25) 100%)",
-  "linear-gradient(180deg, rgba(255,255,255,.25) 0%, rgba(255,255,255,0) 35%, rgba(0,0,0,0) 70%, rgba(0,0,0,.25) 100%)",
-  "linear-gradient(180deg, #9ea3a7, #8c9196)",
+  POLISHED_SHADING,
 ].join(", ");
 
+// Polished aluminum with randomized reflections: angle, number, place,
+// width and strength of the light and dark bands
+function polishedBackground(seed) {
+  if (seed === undefined) return POLISHED;
+  const r = rng(seed * 31 + 3);
+  const angle = Math.round(60 + r() * 70);
+  const count = 3 + Math.floor(r() * 4);
+  const bands = [];
+  for (let i = 0; i < count; i++) {
+    const light = i % 2 === (r() < 0.5 ? 0 : 1);
+    const center = ((i + 0.2 + r() * 0.6) / count) * 100;
+    const width = 5 + r() * 16;
+    const color = light ? `rgba(255,255,255,${(0.35 + r() * 0.45).toFixed(2)})` : `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(2)})`;
+    const clear = light ? "rgba(255,255,255,0)" : "rgba(0,0,0,0)";
+    bands.push(`linear-gradient(${angle}deg, ${clear} ${(center - width).toFixed(1)}%, ${color} ${center.toFixed(1)}%, ${clear} ${(center + width).toFixed(1)}%)`);
+  }
+  return [...bands, POLISHED_SHADING].join(", ");
+}
+
 // Noise textures shared by the styles; "p" is a prefix that keeps the ids unique per card
-function textureFilters(p) {
-  const noise = (id, freq, octaves, seed, matrix, srgb = false) =>
+function textureFilters(p, seed) {
+  const noise = (id, freq, octaves, s, matrix, srgb = false) =>
     `<filter id="${p}${id}" x="0" y="0" width="100%" height="100%"${srgb ? ' color-interpolation-filters="sRGB"' : ""}>` +
-    `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="${octaves}" seed="${seed}"/>` +
+    `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="${octaves}" seed="${s}"/>` +
     `<feColorMatrix values="${matrix}"/></filter>`;
   return [
-    noise("mottle", "0.012 0.03", 3, 4, "0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .22 0"),
-    noise("mottleDark", "0.008 0.02", 3, 12, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .3 -.05"),
+    noise("mottle", "0.012 0.03", 3, seed ?? 4, "0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .22 0"),
+    noise("mottleDark", "0.008 0.02", 3, (seed ?? 4) + 8, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .3 -.05"),
     noise("matte", "0.9", 2, 3, "0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .16 0"),
     noise("matteDark", "0.7", 2, 8, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .14 0"),
     noise("rustBlotch", "0.018 0.03", 5, 11, "0 0 0 0 .7  0 0 0 0 .32  0 0 0 0 .11  0 0 0 3 -1.25", true),
@@ -128,6 +175,7 @@ function textureFilters(p) {
     noise("rustGrain", "0.8", 1, 6, "0 0 0 0 .78  0 0 0 0 .38  0 0 0 0 .14  0 0 0 2.5 -1.4", true),
     noise("rustPits", "0.4", 2, 2, "0 0 0 0 .12  0 0 0 0 .04  0 0 0 0 .02  0 0 0 6 -3.5", true),
     `<filter id="${p}soft"><feGaussianBlur stdDeviation="6"/></filter>`,
+    `<filter id="${p}edgeSoft"><feGaussianBlur stdDeviation="2"/></filter>`,
   ].join("");
 }
 
@@ -150,16 +198,21 @@ function splatter(colors, W, H, seed) {
 }
 
 /**
- * What a style looks like: background CSS, an SVG overlay, whether it gets
+ * What a style looks like: background CSS, an SVG texture, whether it gets
  * the gloss, the head's housing color, the matching fastener color, and
  * whether its text should be dark ("light" style) or light ("dark" style).
  */
-function drawStyle(config, p, W, H) {
-  const { style, pattern: seed } = config;
+function drawStyle(config, paint, p, W, H) {
+  const { style } = config;
+  const seed = config.pattern ?? DEFAULT_PATTERN;
   const rect = (attrs) => `<rect width="100%" height="100%" ${attrs}/>`;
   const tone = (color) => (luma(color) > 0.6 ? "light" : "dark");
   if (style === "polished") {
-    return { bg: POLISHED, svg: rect(`filter="url(#${p}mottle)"`) + rect(`filter="url(#${p}mottleDark)"`), housing: "#b4b9be", metal: "#c3c8cc", tone: "light" };
+    return {
+      bg: polishedBackground(config.pattern),
+      svg: rect(`filter="url(#${p}mottle)"`) + rect(`filter="url(#${p}mottleDark)"`),
+      housing: "#b4b9be", metal: "#c3c8cc", tone: "light",
+    };
   }
   if (style === "brushed") {
     return {
@@ -169,7 +222,6 @@ function drawStyle(config, p, W, H) {
     };
   }
   if (style === "painted") {
-    const paint = hex(config.paint_color);
     return { bg: `${POLISH}, linear-gradient(180deg, ${shade(paint, 1.3)}, ${paint} 55%, ${shade(paint, 0.72)})`, svg: "", housing: paint, metal: paint, tone: tone(paint) };
   }
   if (style === "rusted") {
@@ -193,19 +245,19 @@ function drawStyle(config, p, W, H) {
   }
   const [group, c] = style.split("_");
   if (group === "color") {  // glossy solid paint
-    const paint = COLOR[c];
-    return { bg: `${GLOSS}, linear-gradient(180deg, ${shade(paint, 1.25)}, ${paint} 50%, ${shade(paint, 0.65)})`, svg: "", housing: paint, metal: paint, tone: tone(paint) };
+    const color = COLOR[c];
+    return { bg: `${GLOSS}, linear-gradient(180deg, ${shade(color, 1.25)}, ${color} 50%, ${shade(color, 0.65)})`, svg: "", housing: color, metal: color, tone: tone(color) };
   }
   if (group === "artsy") {  // paint splatter
-    const paint = ARTSY[c];
+    const color = ARTSY[c];
     return {
-      bg: `linear-gradient(180deg, ${shade(paint, 1.15)}, ${paint} 55%, ${shade(paint, 0.8)})`,
-      svg: splatter(SPLATTER[c], W, H, seed + c.length), gloss: true, housing: paint, metal: paint, tone: tone(paint),
+      bg: `linear-gradient(180deg, ${shade(color, 1.15)}, ${color} 55%, ${shade(color, 0.8)})`,
+      svg: splatter(SPLATTER[c], W, H, seed + c.length), gloss: true, housing: color, metal: color, tone: tone(color),
     };
   }
   // Army: worn paint showing rust (near-black on Army Red) in patches and
   // along the edges, and a stenciled star
-  const paint = ARMY[c];
+  const color = ARMY[c];
   const star = c === "white" ? "#a3261c" : "#e9e9e6";
   const wear = c === "red" ? "0 0 0 0 .02  0 0 0 0 .015  0 0 0 0 .012" : "0 0 0 0 .42  0 0 0 0 .2  0 0 0 0 .07";
   const edge = c === "red" ? "0 0 0 0 .02  0 0 0 0 .015  0 0 0 0 .012" : "0 0 0 0 .38  0 0 0 0 .18  0 0 0 0 .06";
@@ -215,7 +267,7 @@ function drawStyle(config, p, W, H) {
     return `${(sx + r * Math.cos(a)).toFixed(1)},${(sy + r * Math.sin(a)).toFixed(1)}`;
   }).join(" ");
   return {
-    bg: `linear-gradient(180deg, ${shade(paint, 1.08)}, ${paint} 60%, ${shade(paint, 0.82)})`,
+    bg: `linear-gradient(180deg, ${shade(color, 1.08)}, ${color} 60%, ${shade(color, 0.82)})`,
     svg: `<defs>
             <filter id="${p}wear" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.045 0.06" numOctaves="4" seed="${seed}"/><feColorMatrix values="${wear}  0 0 0 -14 4.6"/></filter>
             <filter id="${p}edge" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="${seed + 50}"/><feColorMatrix values="${edge}  0 0 0 -10 4.3"/></filter>
@@ -224,7 +276,7 @@ function drawStyle(config, p, W, H) {
           <polygon points="${points}" fill="${star}" opacity=".85"/>
           ${rect(`filter="url(#${p}wear)"`)}
           ${rect(`filter="url(#${p}edge)" mask="url(#${p}edgeMask)"`)}`,
-    gloss: true, housing: paint, metal: paint, tone: tone(paint),
+    gloss: true, housing: color, metal: color, tone: tone(color),
   };
 }
 
@@ -257,15 +309,15 @@ function fastenerSymbols(p) {
 }
 
 /**
- * Where the fasteners go. Every fastener is the same distance from its
- * nearest edge; the corner ones are measured from the rounded corner.
+ * Where the fasteners go. Every fastener is the same distance (inset) from
+ * its nearest edge; the corner ones are measured from the rounded corner.
  * Spacing 0 is corners only; otherwise each long edge is divided into
  * "spacing" gaps, and each short edge is halved again whenever the long-edge
- * gap is at most half of the short edge's current gap.
+ * gap is at most half of the short edge's current gap. Corner fasteners come
+ * first.
  */
-const INSET = 8;
-function fastenerPositions(spacing, W, H, radius) {
-  const c = radius - (radius - INSET) / Math.SQRT2;
+function fastenerPositions(spacing, W, H, radius, inset) {
+  const c = radius - (radius - inset) / Math.SQRT2;
   const points = [[c, c], [W - c, c], [c, H - c], [W - c, H - c]];
   if (!spacing) return points;
   const wide = W >= H;
@@ -275,22 +327,22 @@ function fastenerPositions(spacing, W, H, radius) {
   while (gap <= S / (shortParts * 2)) shortParts *= 2;
   const add = (a, b) => points.push(wide ? [a, b] : [b, a]);
   for (let i = 1; i < spacing; i++) {
-    add(c + i * gap, INSET);
-    add(c + i * gap, short - INSET);
+    add(c + i * gap, inset);
+    add(c + i * gap, short - inset);
   }
   for (let i = 1; i < shortParts; i++) {
-    add(INSET, c + (i * S) / shortParts);
-    add(long - INSET, c + (i * S) / shortParts);
+    add(inset, c + (i * S) / shortParts);
+    add(long - inset, c + (i * S) / shortParts);
   }
   return points;
 }
 
-// The Lampster head, from the integration's icon: housing outline, top ridge,
-// lens opening and the three screws
-const HEAD_OUTLINE = "M21.9903,11.5386c-.0826.3308-.2558.602-.2984.8878v.1504c0,5.2044-4.3393,9.4232-9.6919,9.4232S2.3081,17.7812,2.3081,12.5768c0-.0502.0007-.1504.0007-.1504-.0426-.2858-.2165-.557-.2991-.8878-.0173-.0688-.0092-.2314.0062-.3008.6008-2.691,1.2682-5.4358,1.444-6.0864.4098-1.228,2.0337-2.9294,3.8746-3.064,2.2063-.055,3.9833-.0874,4.6655-.0874s2.4592.0324,4.6655.0874c1.8409.1346,3.4648,1.836,3.8746,3.064.1757.6506.8431,3.3954,1.444,6.0864.0155.0694.0235.232.0062.3008Z";
-const HEAD_RIDGE = "M21.2352,11.1522c-.3024-1.4878-.6706-3.1298-1.094-4.8802l-.0276-.1132c-.0476-.194-.0966-.3946-.1496-.5932-.0018-.0064-.0038-.0128-.006-.019-.0658-.184-.1554-.3692-.2664-.5502-.0006-.001-.0012-.002-.0018-.003-.3246-.5132-.7522-.9748-1.2366-1.3346-.5164-.3838-1.0926-.646-1.6666-.7584-.0028-.0006-.0058-.0012-.0086-.0016l-.1402-.0222c-.004-.0006-.008-.0012-.012-.0016l-.145-.0154c-.006-.0006-.012-.001-.018-.0012-.754-.023-1.55-.04-2.3018-.049-.8346-.0072-1.5756-.0108-2.2664-.0108-1.5586,0-2.939.0182-4.2202.0558h-.001c-.0154.0004-.0308.0008-.0462.0012-.0304.0008-.062.0016-.095.0034-.0044.0002-.0086.0006-.013.001,0,0-.1298.0138-.1434.0152-.0034.0004-.007.0008-.0104.0012-.9906.143-1.9546.7256-2.7142,1.6404-.0006.0008-.0014.0016-.002.0024-.2956.3652-.4894.6944-.6096,1.036-.0024.007-.0046.014-.0064.021-.4576,1.814-1.2598,5.5358-1.2678,5.5732-.0274.1274.0518.2534.1784.2838.0188.0046.0378.0068.0564.0068.1064,0,.2032-.0712.2318-.1782.1124-.4228.2394-.9042.3738-1.414.3656-1.3874.78-2.9592,1.0952-4.0684.4254-1.04,1.8198-1.9512,2.992-1.953h.004c1.1432-.0208,2.4286-.0306,4.0454-.0306.8112,0,1.6238.0024,2.4096.0046h.0024c.7114.0048,1.497.0148,2.2716.029l.108.0104c.0582.0086.0918.0136.1126.0164v.0002c1.0414.189,1.9322.7426,2.444,1.5188.0772.1188.1642.2862.2048.394.091.3144.2174.7716.3754,1.359.2472.919.8648,3.2486,1.097,4.1328.0284.1074.1254.179.232.179.018,0,.0364-.002.0546-.0062.1266-.0296.2066-.1544.1808-.2816Z";
-const HEAD_LENS = "M12.015,4.9077c-4.1974,0-7.6,3.4026-7.6,7.6s3.4026,7.6,7.6,7.6,7.6-3.4026,7.6-7.6-3.4026-7.6-7.6-7.6Z";
-const HEAD_SCREWS = "M11.6614,20.5264c-.1953.1953-.1953.5118,0,.7071s.5118.1953.7071,0,.1953-.5118,0-.7071-.5118-.1953-.7071,0ZM19.1362,8.8045c.2667.0715.5409-.0868.6124-.3536s-.0868-.5409-.3536-.6124-.5409.0868-.6124.3536.0868.5409.3536.6124ZM5.2473,8.1921c-.0715-.2667-.3456-.425-.6124-.3536s-.425.3456-.3536.6124.3456.425.6124.3536.425-.3456.3536-.6124Z";
+// The Lampster icon (the integration's icon): housing outline, top ridge,
+// lens opening, inner ring (two circles) and the three screws
+const ICON = "M21.9903,11.5386c-.0826.3308-.2558.602-.2984.8878v.1504c0,5.2044-4.3393,9.4232-9.6919,9.4232S2.3081,17.7812,2.3081,12.5768c0-.0502.0007-.1504.0007-.1504-.0426-.2858-.2165-.557-.2991-.8878-.0173-.0688-.0092-.2314.0062-.3008.6008-2.691,1.2682-5.4358,1.444-6.0864.4098-1.228,2.0337-2.9294,3.8746-3.064,2.2063-.055,3.9833-.0874,4.6655-.0874s2.4592.0324,4.6655.0874c1.8409.1346,3.4648,1.836,3.8746,3.064.1757.6506.8431,3.3954,1.444,6.0864.0155.0694.0235.232.0062.3008ZM21.2352,11.1522c-.3024-1.4878-.6706-3.1298-1.094-4.8802l-.0276-.1132c-.0476-.194-.0966-.3946-.1496-.5932-.0018-.0064-.0038-.0128-.006-.019-.0658-.184-.1554-.3692-.2664-.5502-.0006-.001-.0012-.002-.0018-.003-.3246-.5132-.7522-.9748-1.2366-1.3346-.5164-.3838-1.0926-.646-1.6666-.7584-.0028-.0006-.0058-.0012-.0086-.0016l-.1402-.0222c-.004-.0006-.008-.0012-.012-.0016l-.145-.0154c-.006-.0006-.012-.001-.018-.0012-.754-.023-1.55-.04-2.3018-.049-.8346-.0072-1.5756-.0108-2.2664-.0108-1.5586,0-2.939.0182-4.2202.0558h-.001c-.0154.0004-.0308.0008-.0462.0012-.0304.0008-.062.0016-.095.0034-.0044.0002-.0086.0006-.013.001,0,0-.1298.0138-.1434.0152-.0034.0004-.007.0008-.0104.0012-.9906.143-1.9546.7256-2.7142,1.6404-.0006.0008-.0014.0016-.002.0024-.2956.3652-.4894.6944-.6096,1.036-.0024.007-.0046.014-.0064.021-.4576,1.814-1.2598,5.5358-1.2678,5.5732-.0274.1274.0518.2534.1784.2838.0188.0046.0378.0068.0564.0068.1064,0,.2032-.0712.2318-.1782.1124-.4228.2394-.9042.3738-1.414.3656-1.3874.78-2.9592,1.0952-4.0684.4254-1.04,1.8198-1.9512,2.992-1.953h.004c1.1432-.0208,2.4286-.0306,4.0454-.0306.8112,0,1.6238.0024,2.4096.0046h.0024c.7114.0048,1.497.0148,2.2716.029l.108.0104c.0582.0086.0918.0136.1126.0164v.0002c1.0414.189,1.9322.7426,2.444,1.5188.0772.1188.1642.2862.2048.394.091.3144.2174.7716.3754,1.359.2472.919.8648,3.2486,1.097,4.1328.0284.1074.1254.179.232.179.018,0,.0364-.002.0546-.0062.1266-.0296.2066-.1544.1808-.2816ZM12.015,4.9077c-4.1974,0-7.6,3.4026-7.6,7.6s3.4026,7.6,7.6,7.6,7.6-3.4026,7.6-7.6-3.4026-7.6-7.6-7.6ZM12.015,19.4077c-1.8431,0-3.5758-.7177-4.879-2.021-1.3032-1.3032-2.021-3.036-2.021-4.879s.7177-3.5758,2.021-4.879c1.3032-1.3032,3.036-2.021,4.879-2.021s3.5758.7177,4.879,2.021c1.3033,1.3032,2.021,3.036,2.021,4.879s-.7177,3.5758-2.021,4.879c-1.3032,1.3033-3.036,2.021-4.879,2.021ZM12.015,18.7077c1.6561,0,3.213-.6449,4.3841-1.8159,1.171-1.171,1.8159-2.728,1.8159-4.3841s-.6449-3.2131-1.8159-4.3841c-1.171-1.171-2.728-1.8159-4.3841-1.8159s-3.213.6449-4.3841,1.8159c-1.171,1.171-1.8159,2.728-1.8159,4.3841s.6449,3.213,1.8159,4.3841c1.171,1.171,2.728,1.8159,4.3841,1.8159ZM11.6614,20.5264c-.1953.1953-.1953.5118,0,.7071s.5118.1953.7071,0,.1953-.5118,0-.7071-.5118-.1953-.7071,0ZM19.1362,8.8045c.2667.0715.5409-.0868.6124-.3536s-.0868-.5409-.3536-.6124-.5409.0868-.6124.3536.0868.5409.3536.6124ZM5.2473,8.1921c-.0715-.2667-.3456-.425-.6124-.3536s-.425.3456-.3536.6124.3456.425.6124.3536.425-.3456.3536-.6124Z";
+const ICON_PARTS = ICON.slice(0, -1).split("ZM").map((s, i) => (i ? "M" : "") + s + "Z");
+const [HEAD_OUTLINE, HEAD_RIDGE, HEAD_LENS] = ICON_PARTS;
+const HEAD_SCREWS = ICON_PARTS.slice(5).join("");
 
 // The head as an image: the light's color (or dark glass when off) fills the lens
 function headPicture(lens, housing) {
@@ -334,9 +386,17 @@ class LampsterCard extends HTMLElement {
         .frame {
           position: relative; height: 100%; box-sizing: border-box; overflow: hidden; isolation: isolate;
           border-radius: var(--ha-card-border-radius, 12px);
-          box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0, 0, 0, .35));
+          box-shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 4px 10px rgba(0, 0, 0, .3);
         }
         .layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        /* A slightly raised panel: lit top and left edges, shaded bottom and right */
+        #bevel {
+          border-radius: inherit; z-index: 1;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, .55), inset 1px 0 0 rgba(255, 255, 255, .3),
+            inset 0 -1px 0 rgba(0, 0, 0, .45), inset -1px 0 0 rgba(0, 0, 0, .3),
+            inset 3px 3px 4px -1px rgba(255, 255, 255, .22), inset -3px -3px 5px -1px rgba(0, 0, 0, .3);
+        }
         .tile {
           position: relative; display: block; height: 100%;
           --ha-card-background: transparent; --card-background-color: transparent;
@@ -345,12 +405,13 @@ class LampsterCard extends HTMLElement {
         }
         .tile.light { --primary-text-color: #1d2126; --secondary-text-color: #3c434b; text-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
         .tile.dark { --primary-text-color: #f4f4f4; --secondary-text-color: #dadada; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
-        #fasteners { z-index: 1; }
+        #fasteners { z-index: 2; }
       </style>
       <div class="frame">
         <div class="layer" id="bg"></div>
         <svg class="layer" id="texture"></svg>
         <div class="layer" id="gloss"></div>
+        <div class="layer" id="bevel"></div>
         <svg class="layer" id="fasteners"></svg>
       </div>`;
     this._frame = this.shadowRoot.querySelector(".frame");
@@ -373,12 +434,12 @@ class LampsterCard extends HTMLElement {
     const tile = tileConfig(config);
     if (this._tile) {
       this._tile.setConfig(tile);
+      this._afterTileUpdate();
     } else if (customElements.get("hui-tile-card")) {
       this._createTile(tile);
     } else {
       // The tile card is loaded on demand; the card helpers load it
       window.loadCardHelpers?.().then(async (helpers) => {
-        if (this._tile) return;
         helpers.createCardElement({ type: "tile", entity: tile.entity });
         await customElements.whenDefined("hui-tile-card");
         if (!this._tile) this._createTile(tileConfig(this._config));
@@ -394,8 +455,15 @@ class LampsterCard extends HTMLElement {
     if (this._hass) this._tile.hass = this._innerHass(this._hass);
     if (this._preview !== undefined) this._tile.preview = this._preview;
     if (this._layout !== undefined) this._tile.layout = this._layout;
-    this._frame.insertBefore(this._tile, this.shadowRoot.getElementById("fasteners"));
-    this._draw();
+    this._frame.insertBefore(this._tile, this.shadowRoot.getElementById("bevel"));
+    this._afterTileUpdate();
+  }
+
+  // Redraw once the tile card has rendered, so the fasteners can avoid its controls
+  _afterTileUpdate() {
+    const done = this._tile?.updateComplete;
+    if (done?.then) done.then(() => this._draw());
+    else this._draw();
   }
 
   set hass(hass) {
@@ -461,30 +529,75 @@ class LampsterCard extends HTMLElement {
     return this._pictureUrl;
   }
 
+  /**
+   * Where the tile card's icon and controls are, relative to the card. Read
+   * from the tile card's rendered layout; if it ever changes, the fasteners
+   * are simply drawn without avoiding them.
+   */
+  _controls() {
+    const root = this._tile?.shadowRoot;
+    if (!root) return { icon: [], features: [] };
+    const origin = this._frame.getBoundingClientRect();
+    const box = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.width && r.height ? { x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height } : null;
+    };
+    const find = (selector) => [...root.querySelectorAll(selector)].map(box).filter(Boolean);
+    const features = root.querySelector("hui-card-features");
+    if (features && this._watched !== features) {
+      this._watched = features;
+      this._resize.observe(features);
+    }
+    return { icon: find("ha-tile-icon, ha-tile-info"), features: find("hui-card-features") };
+  }
+
   _draw() {
     if (!this._config) return;
     const W = this._frame.clientWidth, H = this._frame.clientHeight;
     if (!W || !H) return;
     const p = this._prefix;
-    const look = drawStyle(this._config, p, W, H);
+    const paint = resolveColor(this._config.paint_color, this, "#1f6f78");
+    const look = drawStyle(this._config, paint, p, W, H);
+    const controls = this._controls();
     const root = this.shadowRoot;
+
+    // The style, kept plain behind the controls when asked
+    let texture = look.svg;
+    if (this._config.clear_controls && controls.features.length && texture) {
+      const holes = controls.features.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
+      texture = `<defs><mask id="${p}clear"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs><g mask="url(#${p}clear)">${texture}</g>`;
+    }
     root.getElementById("bg").style.background = look.bg;
-    root.getElementById("texture").innerHTML = `<defs>${textureFilters(p)}</defs>${look.svg}`;
+    root.getElementById("texture").innerHTML = `<defs>${textureFilters(p, this._config.pattern)}</defs>${texture}`;
     root.getElementById("gloss").style.background = look.gloss ? GLOSS : "none";
     if (this._tile) {
       this._tile.classList.toggle("light", look.tone === "light");
       this._tile.classList.toggle("dark", look.tone === "dark");
     }
 
+    // Fasteners: smaller on a single-row card; any along the edges that would
+    // touch the icon or the controls are left out
     const { fasteners, fastener_spacing: spacing } = this._config;
-    const color = this._config.fastener_color === "custom" ? hex(this._config.fastener_custom_color) : look.metal;
-    const radius = parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12;
-    const size = fasteners === "rivets" ? 9 : 11;
-    root.getElementById("fasteners").innerHTML = fasteners === "none" ? "" :
-      `<defs>${fastenerSymbols(p)}</defs>` +
-      fastenerPositions(spacing, W, H, radius).map(([x, y], i) =>
-        `<use href="#${p}${fasteners}" color="${color}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"` +
-        ` transform="rotate(${fasteners === "rivets" ? 0 : (i * 37) % 90} ${x} ${y})"/>`).join("");
+    let markup = "";
+    if (fasteners !== "none") {
+      const compact = H < 80;
+      const inset = compact ? 5 : 7;
+      const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
+      const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
+      const radius = parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12;
+      const avoid = [...controls.icon, ...controls.features];
+      const clear = (x, y) => avoid.every((b) => {
+        const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
+        return Math.hypot(x - nx, y - ny) > size / 2 + 1.5;
+      });
+      markup = `<defs>${fastenerSymbols(p)}</defs>` +
+        fastenerPositions(spacing, W, H, radius, inset)
+          .filter(([x, y], i) => i < 4 || clear(x, y))
+          .map(([x, y], i) =>
+            `<use href="#${p}${fasteners}" color="${color}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"` +
+            ` transform="rotate(${fasteners === "rivets" ? 0 : (i * 37) % 90} ${x} ${y})"/>`).join("");
+    }
+    root.getElementById("fasteners").innerHTML = markup;
 
     // The head's housing follows the style
     if (this._housing !== look.housing) {
@@ -498,14 +611,52 @@ class LampsterCard extends HTMLElement {
 // The editor: the tile card's own editor, plus a panel for the style
 // ---------------------------------------------------------------------------
 
+// Tile card options this card sets itself, so they are left out of its editor
+const HIDDEN_TILE_OPTIONS = ["icon", "show_entity_picture"];
+
+function hideOptions(schema) {
+  return schema
+    .filter((item) => !HIDDEN_TILE_OPTIONS.includes(item.name))
+    .map((item) => (Array.isArray(item.schema) ? { ...item, schema: hideOptions(item.schema) } : item));
+}
+
+/**
+ * The tile card's editor, with the options above left out. It is the tile
+ * card's own editor class, so it keeps every future change to it. It
+ * filters the editor's form layout; if a Home Assistant update renames
+ * that layout, the editor still works and simply shows those options again.
+ */
+function tileEditorType() {
+  if (customElements.get(TILE_EDITOR_TYPE)) return TILE_EDITOR_TYPE;
+  const Base = customElements.get("hui-tile-card-editor");
+  if (!Base) return null;
+  customElements.define(TILE_EDITOR_TYPE, class extends Base {
+    constructor() {
+      super();
+      const original = this._schema;
+      if (typeof original !== "function") return;
+      let lastIn, lastOut;
+      this._schema = (...args) => {
+        const schema = original.apply(this, args);
+        if (schema !== lastIn) {
+          lastIn = schema;
+          lastOut = Array.isArray(schema) ? hideOptions(schema) : schema;
+        }
+        return lastOut;
+      };
+    }
+  });
+  return TILE_EDITOR_TYPE;
+}
+
 const LABELS = {
   collection: "Collection",
   style: "Style",
   paint_color: "Paint color",
   fasteners: "Fasteners",
   fastener_color: "Fastener color",
-  fastener_custom_color: "Custom fastener color",
   fastener_spacing: "Fastener spacing",
+  clear_controls: "Keep the style plain behind the controls",
 };
 
 const select = (options) => ({ select: { mode: "dropdown", options: options.map(([value, label]) => ({ value: String(value), label })) } });
@@ -514,18 +665,27 @@ class LampsterCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    // The panel matches the tile card editor's own sections
     this.shadowRoot.innerHTML = `
       <style>
-        .tile-editor { display: block; }
-        ha-expansion-panel { display: block; margin-top: 24px; }
-        .content { padding: 12px 0 4px; }
+        #tile { display: block; }
+        ha-expansion-panel {
+          display: block; margin-top: 24px;
+          --expansion-panel-content-padding: 0;
+          border-radius: var(--ha-border-radius-md, 8px);
+          --ha-card-border-radius: var(--ha-border-radius-md, 8px);
+        }
+        ha-expansion-panel ha-svg-icon { color: var(--secondary-text-color); }
+        ha-expansion-panel > [slot="header"] { margin: 0; font-size: inherit; font-weight: inherit; }
+        .content { padding: 12px; }
+        ha-form { display: block; }
         .pattern { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
-        .pattern span { color: var(--secondary-text-color); font-size: 14px; }
+        .pattern span { color: var(--secondary-text-color); }
       </style>
       <div id="tile"></div>
       <ha-expansion-panel outlined expanded>
-        <ha-icon slot="leading-icon" icon="mdi:palette-swatch"></ha-icon>
-        <h3 slot="header">The Lampster style</h3>
+        <ha-svg-icon slot="leading-icon" id="icon"></ha-svg-icon>
+        <div slot="header" role="heading" aria-level="3">The Lampster Style</div>
         <div class="content">
           <ha-form id="form"></ha-form>
           <div class="pattern" id="patternRow">
@@ -534,6 +694,7 @@ class LampsterCardEditor extends HTMLElement {
           </div>
         </div>
       </ha-expansion-panel>`;
+    this.shadowRoot.getElementById("icon").path = ICON;
     this._form = this.shadowRoot.getElementById("form");
     this._form.computeLabel = (schema) => LABELS[schema.name] ?? schema.name;
     this._form.addEventListener("value-changed", (ev) => this._formChanged(ev));
@@ -553,43 +714,44 @@ class LampsterCardEditor extends HTMLElement {
     if (this._tileEditor) this._tileEditor.lovelace = lovelace;
   }
 
+  // Called with every change, including edits in the YAML editor
   setConfig(config) {
     this._config = { ...config };
+    this._collection = undefined;
     this._render();
     this._setTileEditorConfig();
   }
 
   async _setTileEditorConfig() {
     if (!this._tileEditor) {
-      if (!this._loading) {
-        this._loading = (async () => {
-          const helpers = await window.loadCardHelpers();
-          helpers.createCardElement({ type: "tile", entity: this._config.entity });
-          await customElements.whenDefined("hui-tile-card");
-          const editor = await customElements.get("hui-tile-card").getConfigElement();
-          editor.classList.add("tile-editor");
-          editor.addEventListener("config-changed", (ev) => {
-            // The tile card's options changed: keep ours and pass the whole card on
-            ev.stopPropagation();
-            const own = Object.fromEntries(OWN_KEYS.filter((k) => k in this._config).map((k) => [k, this._config[k]]));
-            const next = { ...ev.detail.config, ...own, type: this._config.type };
-            delete next.show_entity_picture;  // always on: the head is shown there
-            this._config = next;
-            this._fire();
-          });
-          editor.hass = this._hass;
-          if (this._lovelace) editor.lovelace = this._lovelace;
-          this.shadowRoot.getElementById("tile").replaceWith(editor);
-          this._tileEditor = editor;
-        })();
-      }
+      this._loading ??= (async () => {
+        const helpers = await window.loadCardHelpers();
+        helpers.createCardElement({ type: "tile", entity: this._config.entity });
+        await customElements.whenDefined("hui-tile-card");
+        const original = await customElements.get("hui-tile-card").getConfigElement();
+        const type = tileEditorType();
+        const editor = type ? document.createElement(type) : original;
+        editor.addEventListener("config-changed", (ev) => {
+          // The tile card's options changed: keep ours and pass the whole card on
+          ev.stopPropagation();
+          const own = Object.fromEntries(OWN_KEYS.filter((k) => k in this._config).map((k) => [k, this._config[k]]));
+          const next = { ...ev.detail.config, ...own, type: this._config.type };
+          delete next.show_entity_picture;  // always on: the head is shown there
+          this._config = next;
+          this._fire();
+        });
+        editor.hass = this._hass;
+        if (this._lovelace) editor.lovelace = this._lovelace;
+        this.shadowRoot.getElementById("tile").replaceWith(editor);
+        this._tileEditor = editor;
+      })();
       await this._loading;
     }
     this._tileEditor.setConfig(tileConfig(this._config));
   }
 
   _render() {
-    const c = { ...DEFAULTS, ...this._config };
+    const c = validateForEditor(this._config);
     const collection = COLLECTIONS.find((g) => g.id === (this._collection ?? collectionOf(c.style)));
     const schema = [
       {
@@ -598,42 +760,48 @@ class LampsterCardEditor extends HTMLElement {
           { name: "style", selector: select(collection.styles) },
         ],
       },
-      ...(c.style === "painted" ? [{ name: "paint_color", selector: { color_rgb: {} } }] : []),
+      ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: { default_color: DEFAULTS.paint_color } } }] : []),
       {
         type: "grid", name: "", schema: [
           { name: "fasteners", selector: select(FASTENERS) },
           { name: "fastener_spacing", selector: select(SPACINGS) },
         ],
       },
-      ...(c.fasteners === "none" ? [] : [{ name: "fastener_color", selector: select(FASTENER_COLORS) }]),
-      ...(c.fasteners !== "none" && c.fastener_color === "custom" ? [{ name: "fastener_custom_color", selector: { color_rgb: {} } }] : []),
+      ...(c.fasteners === "none" ? [] : [{
+        name: "fastener_color",
+        selector: { ui_color: { default_color: "match", extra_options: [{ value: "match", label: "Match style" }] } },
+      }]),
+      { name: "clear_controls", selector: { boolean: {} } },
     ];
     this._form.schema = schema;
-    this._form.data = { ...c, collection: collection.id, fastener_spacing: String(c.fastener_spacing) };
+    const asPicker = (v) => (Array.isArray(v) ? hex(v) : v);
+    this._form.data = {
+      ...c, collection: collection.id, fastener_spacing: String(c.fastener_spacing),
+      paint_color: asPicker(c.paint_color), fastener_color: asPicker(c.fastener_color),
+    };
 
-    const patterned = PATTERNED(c.style);
-    this.shadowRoot.getElementById("patternRow").style.display = patterned ? "" : "none";
-    if (patterned) {
-      const what = c.style === "rusted" ? "rust" : c.style.startsWith("army") ? "wear" : "splatter";
+    const what = RANDOMIZED(c.style);
+    this.shadowRoot.getElementById("patternRow").style.display = what ? "" : "none";
+    if (what) {
       this.shadowRoot.getElementById("randomize").textContent = `Randomize ${what}`;
-      this.shadowRoot.getElementById("patternText").textContent = `Pattern ${c.pattern}`;
+      this.shadowRoot.getElementById("patternText").textContent =
+        c.pattern === undefined ? "Default pattern" : `Pattern ${c.pattern}`;
     }
   }
 
   _formChanged(ev) {
     ev.stopPropagation();
     const value = ev.detail.value;
-    const c = { ...DEFAULTS, ...this._config };
+    const c = validateForEditor(this._config);
     if (value.collection !== collectionOf(c.style) && value.style === c.style) {
       // A new collection: start on its first style
       this._collection = value.collection;
-      const first = COLLECTIONS.find((g) => g.id === value.collection).styles[0][0];
-      this._update({ style: first });
+      this._update({ style: COLLECTIONS.find((g) => g.id === value.collection).styles[0][0] });
       return;
     }
     this._collection = undefined;
     const changes = {};
-    for (const key of OWN_KEYS) {
+    for (const key of Object.keys(DEFAULTS)) {
       if (!(key in value)) continue;
       const next = key === "fastener_spacing" ? Number(value[key]) : value[key];
       if (JSON.stringify(next) !== JSON.stringify(c[key])) changes[key] = next;
@@ -642,13 +810,29 @@ class LampsterCardEditor extends HTMLElement {
   }
 
   _update(changes) {
-    this._config = { ...this._config, ...changes };
+    const next = { ...this._config, ...changes };
+    // Cards saved by the first version kept the custom color separately
+    if ("fastener_color" in changes) delete next.fastener_custom_color;
+    this._config = next;
     this._render();
     this._fire();
   }
 
   _fire() {
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+  }
+}
+
+// The editor shows what the card would draw, without failing on a half-typed YAML value
+function validateForEditor(config) {
+  try {
+    return validate({ entity: "-", ...config });
+  } catch (err) {
+    const c = { ...DEFAULTS, ...config };
+    if (!STYLES[c.style]) c.style = DEFAULTS.style;
+    if (!FASTENERS.some(([id]) => id === c.fasteners)) c.fasteners = DEFAULTS.fasteners;
+    if (!SPACINGS.some(([n]) => n === Number(c.fastener_spacing))) c.fastener_spacing = DEFAULTS.fastener_spacing;
+    return c;
   }
 }
 
