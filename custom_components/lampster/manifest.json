@@ -1,7 +1,7 @@
 {
   "domain": "lampster",
   "name": "The Lampster",
-  "after_dependencies": ["frontend", "http"],
+  "after_dependencies": ["frontend", "http", "lovelace"],
   "bluetooth": [
     {
       "local_name": "Lamp*",
