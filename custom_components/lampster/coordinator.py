@@ -197,12 +197,12 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data: LampState | None = None
         self.temperature: float | None = None
         self.effect: str | None = None
+        self.effect_brightness = 255
         # Speed for effects in percent (the Effects speed setting)
         self.effect_speed: int = EFFECT_SPEED_DEFAULT
         # The running effect's own speed when an action started it with one;
         # None when it follows effect_speed
         self.effect_speed_override: int | None = None
-        self._effect_brightness = 255
 
         # Diagnostics
         self.last_connect_ms: int | None = None
@@ -786,7 +786,13 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         )
         self.effect = effect
         self.effect_speed_override = speed
-        self._effect_brightness = brightness
+        self.effect_brightness = brightness
+        # The effect's writes are not reported, so The Lampster would still
+        # show as off when an effect is started from off; it is on in the
+        # effect's mode until the effect stops
+        self.data = dataclasses.replace(
+            self.data or LampState(is_on=True, mode=mode), is_on=True, mode=mode
+        )
         self._async_start_task(mode, steps, f"effect {effect}")
         self._record(f"Started effect {effect} at {speed or self.effect_speed}% speed")
         self.async_update_listeners()
@@ -795,7 +801,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Set the speed for effects; a running effect that follows it restarts."""
         self.effect_speed = speed
         if self.effect and self.effect_speed_override is None:
-            await self.async_start_effect(self.effect, self._effect_brightness)
+            await self.async_start_effect(self.effect, self.effect_brightness)
 
     async def async_stop_effect(self) -> None:
         """Stop the running effect, if any (the lamp keeps its last color)."""
