@@ -2,6 +2,33 @@
 
 Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model: LA-2017B).
 
+## Status of this fork
+
+*Last updated: 2026-10-21*
+
+This is GizmoGoody's fork of [yamanote1138/lampster-ha-integration](https://github.com/yamanote1138/lampster-ha-integration). It is maintained on its own and is well ahead of the original:
+
+- **Install from this fork.** The `stable` branch (the default) has every finished fix and feature below. Each one was tested on its own branch on GitHub, then merged.
+- **The original repository** has version 1.0.1. [Pull request #2](https://github.com/yamanote1138/lampster-ha-integration/pull/2) (version 1.1.0: the setup fix for issue #1, instant touch-button sync, effects, transitions, diagnostics and repairs) was opened on 2026-09-27 and has not been reviewed yet. Each change listed below is offered to the original repository as its own pull request too.
+- **Protocol notes** are offered to Noki's protocol documentation in [Noki/the-lampster pull request #3](https://github.com/Noki/the-lampster/pull/3) (opened on 2026-10-21).
+- **The Lampster's icon** was added to [custom-brand-icons](https://github.com/elax46/custom-brand-icons) on 2026-10-10.
+
+What `stable` adds to version 1.1.0, newest first:
+
+| Date | Change |
+| --- | --- |
+| 2026-10-21 | The Lampster shows as on while an effect runs, also when the effect was started from off |
+| 2026-10-09 | The Lampster card for dashboards: a tile card in metal or The Lampster's own finishes, with fasteners, a lens that shows the light's color, and Match, Flat or Console controls |
+| 2026-10-08 | Disconnects cleanly when Home Assistant stops, so The Lampster does not lock up after a restart |
+| 2026-10-06 | Repair notice when The Lampster has not been heard for a while; the phone app is named The Lampster app |
+| 2026-10-06 | More effects (Spin, Fireworks, Pursuit and others) |
+| 2026-10-05 | Effects speed setting and a Start effect action; effect steps keep time; a new color shows right after a mode change |
+| 2026-10-05 | Periodic or Constant connection, chosen in Configure |
+| 2026-10-05 | Levels read after a mode change are kept |
+| 2026-10-04 | Turning off and on works like the touch button and keeps the mode and levels; a touch-button hold stops a white effect |
+| 2026-10-04 | Color temperatures are reported exactly as requested; the Bluetooth uplink sensor shows the adapter or proxy in use |
+| 2026-10-04 | Diagnostics keep recent events; corrected protocol notes |
+
 ## Features
 
 - ✅ **Automatic Bluetooth Discovery** - Device appears automatically in HA
@@ -35,7 +62,7 @@ Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. In Home Assistant, open **HACS**
 3. Click the **⋮** menu (top right) → **Custom repositories**
-4. Repository: `https://github.com/yamanote1138/lampster-ha-integration`
+4. Repository: `https://github.com/GizmoGoody/lampster-ha-integration`
 5. Type: **Integration**, then click **Add**
 6. Search HACS for "The Lampster", open it and click **Download**
 7. Restart Home Assistant
@@ -494,6 +521,5 @@ MIT License - See LICENSE file for details
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yamanote1138/lampster-ha-integration/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yamanote1138/lampster-ha-integration/discussions)
+- **Issues**: [GitHub Issues](https://github.com/GizmoGoody/lampster-ha-integration/issues)
 - **Protocol Documentation**: [Noki's the-lampster](https://github.com/Noki/the-lampster)
