@@ -12,11 +12,11 @@
  *   color fills the lens. The picture is built in memory; no files are written.
  *
  * Every tile card option works the same way here. The card's own options:
- *   style, paint_color, pattern, features_style, and
+ *   style, paint_color, head_color, pattern, features_style, and
  *   fasteners: { type, color, spacing }
  *
  * Style "none" keeps the tile card's own look from the theme and adds only
- * the head (in paint_color) and the fasteners.
+ * the head (in head_color) and the fasteners.
  */
 
 const CARD_TYPE = "lampster-card";
@@ -79,19 +79,26 @@ const DEFAULTS = {
   style: "polished",
   features_style: "match",
 };
-// paint_color: the paint of Painted (panel and head), or of None's head
-const DEFAULT_PAINT = { painted: "teal", none: "light-grey" };
+// paint_color: Painted's paint (the panel, and the head unless head_color
+// says otherwise). head_color: "match" (the head takes the style's color) or
+// any color; None has no style color to match, so it needs a color.
+const DEFAULT_PAINT = "teal";
+const DEFAULT_HEAD = { none: "light-grey" };
+const defaultHead = (style) => DEFAULT_HEAD[style] ?? MATCH[0];
 const FASTENER_DEFAULTS = { type: "rivets", color: "match", spacing: 4 };
 const DEFAULT_PATTERN = 17;
 // The card's own options; everything else belongs to the tile card
-const OWN_KEYS = ["style", "paint_color", "pattern", "features_style", "fasteners"];
-const usesPaint = (style) => style === "painted" || style === "none";
+const OWN_KEYS = ["style", "paint_color", "head_color", "pattern", "features_style", "fasteners"];
 
 function validate(config) {
   if (!config.entity) throw new Error("Specify an entity");
   const c = { ...DEFAULTS, ...config };
   if (!STYLES[c.style]) throw new Error(`Unknown style: ${c.style}`);
-  if (usesPaint(c.style)) c.paint_color ??= DEFAULT_PAINT[c.style];
+  if (c.style === "painted") c.paint_color ??= DEFAULT_PAINT;
+  c.head_color ??= defaultHead(c.style);
+  if (c.style === "none" && c.head_color === MATCH[0]) {
+    throw new Error("head_color cannot be match with style none (there is no style color to match); choose a color");
+  }
   if (!FEATURES_STYLES.some(([id]) => id === c.features_style)) {
     throw new Error(`features_style must be one of ${FEATURES_STYLES.map(([id]) => id).join(", ")}`);
   }
@@ -872,7 +879,8 @@ class LampsterCard extends HTMLElement {
     const W = this._frame.clientWidth, H = this._frame.clientHeight;
     if (!W || !H) return;
     const p = this._prefix;
-    const paint = resolveColor(this._config.paint_color, this, this._config.style === "none" ? "#bdbdbd" : "#1f6f78");
+    const { style, head_color: headColor } = this._config;
+    const paint = style === "none" ? resolveColor(headColor, this, "#bdbdbd") : resolveColor(this._config.paint_color, this, "#1f6f78");
     const look = drawStyle(this._config, paint, p, W, H);
     const controls = this._controls();
     this._settle(layoutSignature(controls));
@@ -938,9 +946,10 @@ class LampsterCard extends HTMLElement {
     }
     root.getElementById("fasteners").innerHTML = markup;
 
-    // The head's housing follows the style
-    if (this._housing !== look.housing) {
-      this._housing = look.housing;
+    // The head's housing follows the style, unless it has a color of its own
+    const housing = headColor === MATCH[0] ? look.housing : resolveColor(headColor, this, look.housing);
+    if (this._housing !== housing) {
+      this._housing = housing;
       if (this._hass && this._tile) this._tile.hass = this._innerHass(this._hass);
     }
   }
@@ -992,6 +1001,7 @@ const LABELS = {
   collection: "Collection",
   style: "Style",
   paint_color: "Paint color",
+  head_color: "Head color",
   // The fastener fields; they are saved under fasteners as color and spacing
   fastener_color: "Fastener color",
   fastener_spacing: "Fastener spacing",
@@ -1166,13 +1176,17 @@ class LampsterCardEditor extends HTMLElement {
     const [look, controls, fasteners] = this._forms;
     const none = c.style === "none";
     const collectionField = { name: "collection", selector: select(COLLECTIONS.map((g) => [g.id, g.name])) };
-    look.schema = [
-      none
-        // The theme's own tile: only the head's color to choose
-        ? { type: "grid", name: "", schema: [collectionField, { name: "paint_color", label: "Head color", selector: { ui_color: {} } }] }
-        : { type: "grid", name: "", schema: [collectionField, { name: "style", selector: select(collection.styles) }] },
-      ...(c.style === "painted" ? [{ name: "paint_color", selector: { ui_color: {} } }] : []),
-    ];
+    // The head: "Match style" for every style but None, which has no style color
+    const headField = { name: "head_color", selector: { ui_color: none ? {} : { extra_options: [{ value: MATCH[0], label: MATCH[1] }] } } };
+    look.schema = none
+      // The theme's own tile: only the head's color to choose
+      ? [{ type: "grid", name: "", schema: [collectionField, headField] }]
+      : [
+        { type: "grid", name: "", schema: [collectionField, { name: "style", selector: select(collection.styles) }] },
+        c.style === "painted"
+          ? { type: "grid", name: "", schema: [{ name: "paint_color", selector: { ui_color: {} } }, headField] }
+          : headField,
+      ];
     // Randomize and Features style do not apply to the theme's own tile
     this.shadowRoot.getElementById("row").style.display = none ? "none" : "";
     controls.schema = [{ name: "features_style", selector: select(FEATURES_STYLES) }];
@@ -1214,7 +1228,7 @@ class LampsterCardEditor extends HTMLElement {
     }
     this._collection = undefined;
     const changes = {};
-    for (const key of ["style", "paint_color", "features_style"]) {
+    for (const key of ["style", "paint_color", "head_color", "features_style"]) {
       if (key in value && JSON.stringify(value[key]) !== JSON.stringify(c[key])) changes[key] = value[key];
     }
     // The fastener fields go into the fasteners group; the spacing keeps an
@@ -1248,7 +1262,9 @@ class LampsterCardEditor extends HTMLElement {
  * The configuration as the editor saves it, from settings the card accepts:
  * every option the chosen style uses written out, defaults included (so
  * "match" appears in the YAML), and the options it does not use removed:
- * - paint_color only for Painted and None,
+ * - paint_color only for Painted,
+ * - head_color for every style ("match" is not offered with None, so
+ *   switching to None from "match" starts None's head at its default color),
  * - pattern only for styles with something to randomize,
  * - features_style for every style but None,
  * - fasteners color and spacing unless the type is none.
@@ -1257,8 +1273,10 @@ function explicit(config) {
   const c = { ...config };
   const style = c.style ?? DEFAULTS.style;
   c.style = style;
-  if (usesPaint(style)) c.paint_color ??= DEFAULT_PAINT[style];
+  if (style === "painted") c.paint_color ??= DEFAULT_PAINT;
   else delete c.paint_color;
+  if (style === "none" && c.head_color === MATCH[0]) delete c.head_color;
+  c.head_color ??= defaultHead(style);
   if (!RANDOMIZED(style)) delete c.pattern;
   if (style === "none") delete c.features_style;
   else c.features_style ??= DEFAULTS.features_style;
