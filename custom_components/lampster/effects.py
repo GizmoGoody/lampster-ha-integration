@@ -19,12 +19,18 @@ from .lampster.models import LampState, RGBColor, WhiteColor
 EFFECT_CANDLE = "candle"
 EFFECT_FIREPLACE = "fireplace"
 EFFECT_BREATHE = "breathe"
+EFFECT_SPIN_CW = "spin_cw"
+EFFECT_SPIN_CCW = "spin_ccw"
+EFFECT_SPIN_ALTERNATING = "spin_alternating"
 EFFECTS = (
     EFFECT_COLORLOOP,
     EFFECT_RANDOM,
     EFFECT_CANDLE,
     EFFECT_FIREPLACE,
     EFFECT_BREATHE,
+    EFFECT_SPIN_CW,
+    EFFECT_SPIN_CCW,
+    EFFECT_SPIN_ALTERNATING,
 )
 
 MODE_RGB = "rgb"
@@ -39,6 +45,14 @@ RANDOM_STEP = 5.0
 BREATHE_PERIOD = 5.0
 BREATHE_STEP = 0.2
 BREATHE_MIN = 0.1
+# Spin: each LED package has its red, blue and green parts side by side, all
+# turned the same way around the ring. Lighting one part at a time moves the
+# light in every package a little, so the ring appears to turn. Going
+# counterclockwise the order is red, blue, green; reversed it turns clockwise.
+SPIN_CCW_ORDER = ((1, 0, 0), (0, 0, 1), (0, 1, 0))
+SPIN_STEP = 0.15
+# Spin Alternating: change direction after this many seconds
+SPIN_ALTERNATE_AFTER = 4.0
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
 
@@ -137,6 +151,20 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
             )
             yield Step(make_color(mode, tuple(v * factor for v in peak)), BREATHE_STEP)
             t += BREATHE_STEP
+    elif effect in (EFFECT_SPIN_CW, EFFECT_SPIN_CCW, EFFECT_SPIN_ALTERNATING):
+        clockwise = effect == EFFECT_SPIN_CW
+        steps_per_direction = max(1, round(SPIN_ALTERNATE_AFTER / SPIN_STEP))
+        index = 0
+        count = 0
+        while True:
+            red, green, blue = SPIN_CCW_ORDER[index]
+            yield Step(
+                RGBColor(_pct(red * level), _pct(green * level), _pct(blue * level)), SPIN_STEP
+            )
+            index = (index + (-1 if clockwise else 1)) % len(SPIN_CCW_ORDER)
+            count += 1
+            if effect == EFFECT_SPIN_ALTERNATING and count % steps_per_direction == 0:
+                clockwise = not clockwise
     else:
         raise ValueError(f"Unknown effect: {effect}")
 

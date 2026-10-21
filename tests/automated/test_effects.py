@@ -17,6 +17,7 @@ from custom_components.lampster.effects import (
     transition_steps,
     zero_color,
 )
+from custom_components.lampster import effects
 from custom_components.lampster.lampster.models import LampState, RGBColor, WhiteColor
 from custom_components.lampster.light import (
     _device_to_kelvin,
@@ -52,6 +53,30 @@ def test_effect_steps_are_valid(effect: str) -> None:
     for step in itertools.islice(effect_steps(effect, 200, state), 200):
         assert step.delay > 0
         assert all(0 <= value <= 100 for value in color_values(step.color))
+
+
+def _spin_colors(effect: str, count: int) -> list[RGBColor]:
+    return [step.color for step in itertools.islice(effect_steps(effect, 255, None), count)]
+
+
+def test_spin_directions() -> None:
+    """Spin lights one color at a time: red, blue, green counterclockwise."""
+    red, green, blue = RGBColor(100, 0, 0), RGBColor(0, 100, 0), RGBColor(0, 0, 100)
+    assert _spin_colors("spin_ccw", 4) == [red, blue, green, red]
+    assert _spin_colors("spin_cw", 4) == [red, green, blue, red]
+
+
+def test_spin_alternating_changes_direction() -> None:
+    """Spin Alternating turns one way, then the other."""
+    red, green, blue = (100, 0, 0), (0, 100, 0), (0, 0, 100)
+    ccw_next = {red: blue, blue: green, green: red}
+    cw_next = {after: before for before, after in ccw_next.items()}
+    per_direction = round(effects.SPIN_ALTERNATE_AFTER / effects.SPIN_STEP)
+    colors = [color_values(c) for c in _spin_colors("spin_alternating", per_direction * 3)]
+    for i in range(1, len(colors)):
+        # Each step moves the way the previous step's direction pointed
+        expected = ccw_next if ((i - 1) // per_direction) % 2 == 0 else cw_next
+        assert colors[i] == expected[colors[i - 1]], i
 
 
 def test_effect_modes() -> None:
