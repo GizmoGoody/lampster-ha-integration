@@ -108,7 +108,7 @@ Effects are chosen from the light card or with `light.turn_on`:
 | Breathe | The current color slowly brightens and dims |
 | Spin CW, Spin CCW | The ring of LEDs appears to turn clockwise or counterclockwise. Each LED has its red, blue and green parts side by side, so lighting them one after another moves the light around the ring; the color changes as it turns |
 | Spin Alternating | Spins one way, then the other, changing direction every 4 seconds |
-| Fireworks | Bursts of red, orange, gold, green, blue, purple and white that flash on and fade out between dark pauses, sometimes two or three in a row. At most about one burst a second |
+| Fireworks | Each shell launches as a dim orange trail that slowly brightens, then bursts in red, orange, gold, green, blue, purple or white and fades: quickly, changing color, slowly in gold (willow) or with a crackle. Sometimes several shells come in a row like a finale. Bursts are at least a second apart |
 | Pursuit | Red and blue in turn, like police lights, each fading in and out over half a second. Slower than real police lights on purpose, so it stays under three flashes a second |
 
 The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or tapping or holding the touch button stops an effect or fade, whether it runs in white or in color. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
