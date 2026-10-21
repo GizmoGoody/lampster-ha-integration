@@ -109,11 +109,11 @@ Effects are chosen from the light card or with `light.turn_on`:
 
 | Effect | Description |
 |--------|-------------|
+| Breathe | The current color slowly brightens and dims |
 | Color Loop | Cycles through all colors, once a minute |
 | Random | A different color every 5 seconds |
 | Candle | Warm white with an irregular flicker |
 | Fireplace | Red and orange embers that flare and fade |
-| Breathe | The current color slowly brightens and dims |
 | Spin CW, Spin CCW | The ring of LEDs appears to turn clockwise or counterclockwise. Each LED has its red, blue and green parts side by side, so lighting them one after another moves the light around the ring; the color changes as it turns |
 | Spin Alternating | Spins one way, then the other, changing direction every 4 seconds |
 | Fireworks | The Lampster turns off; after 1 to 5 seconds a dim orange trail appears and slowly brightens from 5% to 20% over 3 to 5 seconds, then the shell bursts in red, orange, gold, green, blue, purple or white (50%, then at once 80 to 100%) and fades back to off over 1 to 3 seconds. Then the next shell. Ignores the light's brightness; follows the Effects speed |
