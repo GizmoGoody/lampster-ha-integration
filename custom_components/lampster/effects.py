@@ -23,6 +23,7 @@ EFFECT_SPIN_CW = "spin_cw"
 EFFECT_SPIN_CCW = "spin_ccw"
 EFFECT_SPIN_ALTERNATING = "spin_alternating"
 EFFECT_FIREWORKS = "fireworks"
+EFFECT_PURSUIT = "pursuit"
 EFFECTS = (
     EFFECT_COLORLOOP,
     EFFECT_RANDOM,
@@ -33,6 +34,7 @@ EFFECTS = (
     EFFECT_SPIN_CCW,
     EFFECT_SPIN_ALTERNATING,
     EFFECT_FIREWORKS,
+    EFFECT_PURSUIT,
 )
 
 MODE_RGB = "rgb"
@@ -74,6 +76,11 @@ FIREWORKS_FADE = (0.6, 1.5)
 FIREWORKS_DARK = (0.3, 2.0)
 FIREWORKS_FINALE_CHANCE = 0.2
 FIREWORKS_FINALE_GAP = 0.3
+# Pursuit: red and blue like police lights, but slow enough to be safe: each
+# color fades in, holds and fades out over half a second, so the color changes
+# twice a second (under the usual limit of three flashes in a second)
+PURSUIT_COLORS = ((100, 0, 0), (0, 0, 100))
+PURSUIT_STEPS = ((0.5, 0.1), (1.0, 0.3), (0.5, 0.1))  # (level, seconds)
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
 
@@ -161,6 +168,11 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
             )
     elif effect == EFFECT_FIREWORKS:
         yield from _fireworks(level)
+    elif effect == EFFECT_PURSUIT:
+        while True:
+            for color in PURSUIT_COLORS:
+                for factor, delay in PURSUIT_STEPS:
+                    yield Step(RGBColor(*(_pct(c / 100 * level * factor) for c in color)), delay)
     elif effect == EFFECT_BREATHE:
         mode = effect_mode(effect, state)
         peak = color_values(current_color(state, mode))

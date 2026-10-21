@@ -20,7 +20,8 @@
               "spin_cw": "mdi:rotate-right",
               "spin_ccw": "mdi:rotate-left",
               "spin_alternating": "mdi:sync",
-              "fireworks": "mdi:firework"
+              "fireworks": "mdi:firework",
+              "pursuit": "mdi:car-emergency"
             }
           }
         }
