@@ -814,6 +814,10 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         try:
             client: LampsterClient | None = None
             for step in steps:
+                # Each step lasts its delay from when it started, including the
+                # write, so a slow write (for example switching mode for the
+                # first step) does not push the rest of the effect back
+                started = time.monotonic()
                 async with self._lock:
                     client = await self._async_ensure_connected(name)
                     if self._task_mode != mode or (
@@ -834,7 +838,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     # against what the effect or transition last wrote
                     self._reported = dataclasses.replace(client.state)
                     self._async_cancel_off_disconnect()
-                await asyncio.sleep(step.delay)
+                await asyncio.sleep(max(0.0, step.delay - (time.monotonic() - started)))
             # Done: the lamp's own reports apply normally again
             self._task_mode = None
             async with self._lock:
