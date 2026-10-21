@@ -98,12 +98,18 @@ const FEATURE_HTML = {
   "light-color-favorites": () => `<div style="display: flex; gap: 12px; height: var(--feature-height, 42px)">${
     ["#ff2222", "#44ff00", "#3333ff", "#55ffff", "#ff22ff"].map((color) =>
       `<ha-favorite-color-button color="${color}" style="flex: 1; height: 100%; --ha-favorite-color-button-border-radius: var(--feature-border-radius, 12px)"></ha-favorite-color-button>`).join("")}</div>`,
-  "light-effect": () => `<div style="height: var(--feature-height, 42px); border-radius: var(--feature-border-radius, 12px); background: rgba(255,255,255,.12)"></div>`,
+  "light-effect": () => `<div data-control style="height: var(--feature-height, 42px); border-radius: var(--feature-border-radius, 12px); background: rgba(255,255,255,.12)"></div>`,
   "toggle": () => `<ha-control-switch></ha-control-switch>`,
 };
-customElements.define("hui-card-feature", class extends StandIn {
+// The feature's own element (such as hui-toggle-card-feature), holding its control
+customElements.define("hui-stand-in-card-feature", class extends StandIn {
   connectedCallback() {
     this.shadowRoot.innerHTML = `<style>:host { display: block; } ${featureStyles}</style>${FEATURE_HTML[this.getAttribute("type")]()}`;
+  }
+});
+customElements.define("hui-card-feature", class extends StandIn {
+  connectedCallback() {
+    this.shadowRoot.innerHTML = `<style>:host > * { pointer-events: auto; }</style><hui-stand-in-card-feature type="${this.getAttribute("type")}"></hui-stand-in-card-feature>`;
   }
 });
 
@@ -113,9 +119,13 @@ customElements.define("hui-card-features", class extends StandIn {
     const types = this.getAttribute("types").split(",");
     const columns = this.getAttribute("columns") || 1;
     this.shadowRoot.innerHTML = `<style>
-      :host { display: grid; grid-template-columns: repeat(${columns}, minmax(0, 1fr)); gap: 12px; width: 100%;
-        --feature-height: 42px; --feature-border-radius: var(--ha-card-features-border-radius, var(--ha-border-radius-lg, 12px)); }
-    </style>` + types.map((type) => `<hui-card-feature type="${type}"></hui-card-feature>`).join("");
+      :host { display: grid; grid-template-columns: repeat(${columns}, minmax(0, 1fr)); gap: 12px var(--feature-column-gap); width: 100%;
+        --feature-height: 42px; --feature-border-radius: var(--ha-card-features-border-radius, var(--ha-border-radius-lg, 12px));
+        --feature-column-gap: 24px; --feature-divider-inset: 12px; }
+      .divided { box-sizing: border-box; margin-inline-start: calc(-1 * var(--feature-divider-inset));
+        padding-inline-start: var(--feature-divider-inset); border-inline-start: 1px solid rgba(255, 255, 255, .25); }
+    </style>` + types.map((type, index) =>
+      `<hui-card-feature type="${type}" class="${index % columns > 0 ? "divided" : ""}"></hui-card-feature>`).join("");
   }
 });
 

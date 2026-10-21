@@ -97,19 +97,32 @@ window.runChecks = (expectations = {}) => {
           const want = expectations.pressed?.[title];
           if (want !== undefined) check(title, JSON.stringify(pressed) === JSON.stringify(want), `pressed key: ${pressed.join(",") || "none"}`);
         }
-        // Each channel lines up with its feature
         const origin = frame.getBoundingClientRect();
         const scale = origin.width / frame.offsetWidth;
-        const boxes = featureEls.flatMap((f) => {
-          const keys = deep(f, "ha-favorite-color-button");
-          return (keys.length ? keys : [f]).map((el) => {
-            const r = el.getBoundingClientRect();
-            return { x: (r.left - origin.left) / scale, y: (r.top - origin.top) / scale };
-          });
+
+        // Each channel surrounds its control (not a padded wrapper) with an
+        // even gap, and its corners follow the control's
+        const controlBoxes = (tile ? deep(tile, "ha-control-slider, ha-control-switch, [data-control], ha-favorite-color-button") : []).map((el) => {
+          const r = el.getBoundingClientRect();
+          const shape = el.shadowRoot?.querySelector(".slider, .switch, button") ?? el;
+          const radius = parseFloat(getComputedStyle(shape).borderTopLeftRadius) || 0;
+          const w = r.width / scale, h = r.height / scale;
+          return { x: (r.left - origin.left) / scale, y: (r.top - origin.top) / scale, w, h, radius: Math.min(radius, w / 2, h / 2) };
         });
-        const lined = [...root.querySelectorAll("#channels .channel")].every((c) =>
-          boxes.some((b) => Math.abs(parseFloat(c.style.left) - b.x) <= 4 && Math.abs(parseFloat(c.style.top) - b.y) <= 4));
-        check(title, lined, "each channel lines up with its feature");
+        for (const c of root.querySelectorAll("#channels .channel")) {
+          const x = parseFloat(c.style.left), y = parseFloat(c.style.top), w = parseFloat(c.style.width), h = parseFloat(c.style.height);
+          const radius = parseFloat(c.style.borderRadius);
+          const control = controlBoxes.find((b) => {
+            const gap = b.x - x;
+            return gap > 0.5 && gap < 4 && Math.abs((b.y - y) - gap) < 1 && Math.abs((w - b.w) / 2 - gap) < 1 && Math.abs((h - b.h) / 2 - gap) < 1;
+          });
+          check(title, Boolean(control), `the channel at ${Math.round(x)},${Math.round(y)} surrounds its control evenly`);
+          if (control) {
+            const gap = control.x - x;
+            const want = Math.min(control.radius + gap, w / 2, h / 2);
+            check(title, Math.abs(radius - want) < 1, `the channel at ${Math.round(x)},${Math.round(y)} follows its control's corners (${radius.toFixed(1)} for ${want.toFixed(1)})`);
+          }
+        }
       } else {
         check(title, channels === 0, "no channels");
       }
