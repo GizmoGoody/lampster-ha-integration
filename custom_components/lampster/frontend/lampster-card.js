@@ -533,7 +533,7 @@ const CONTROL_SHEET = `
   }
   /* A shallow dish in the tab, for a thumb to rest in */
   :host([lampster-slide]) .switch .button::after {
-    content: ""; position: absolute; left: 16%; right: 16%; top: 20%; bottom: 20%;
+    content: ""; position: absolute; inset: 4px;
     border-radius: 9999px;
     background: radial-gradient(ellipse at 50% 30%, rgba(0,0,0,.26), rgba(0,0,0,.1) 55%, rgba(255,255,255,.1));
     box-shadow: inset 0 2px 3px rgba(0,0,0,.35), inset 0 -1px 1px rgba(255,255,255,.35);
