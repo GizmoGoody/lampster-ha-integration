@@ -20,6 +20,11 @@ window.makeHass = (attributes = {}, state = "on") => {
       },
     },
     entities: { "light.the_lampster": { platform: "lampster" } },
+    calls: [],
+    callService(domain, service, data) {
+      hass.calls.push({ domain, service, data });
+      return Promise.resolve();
+    },
   };
   hass.connection = { hass };
   return hass;
