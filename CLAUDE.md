@@ -124,11 +124,12 @@ All BLE-related constants live in `lampster/constants.py`:
 - Always provide context in exception messages
 
 ### State Management
-The Lampster doesn't support reading state, so:
-- Track state locally in `LampState` dataclass
-- State is optimistic (not verified by device)
-- Document this limitation in code comments
-- Consider implementing state refresh commands
+The Lampster can be read and pushes notifications:
+- MODE, WHITE and RGB can be read; the state is read on every connection
+- While connected, touch-button changes arrive as MODE/WHITE/RGB notifications
+- Writes made over Bluetooth are not reported back, so the client tracks
+  what it wrote in the `LampState` dataclass
+- A touch-button mode change reports only MODE, so the levels are read after it
 
 ## Testing Strategy
 
@@ -243,22 +244,30 @@ uv sync --all-extras
 ### BLE Characteristics
 Based on [Noki's documentation](https://github.com/Noki/the-lampster):
 
-| Characteristic | Handle | UUID Pattern | Function |
-|----------------|--------|--------------|----------|
-| Mode Control | 0x0021 | 0000ffe9-... | Power, mode selection |
-| RGB Control | 0x002a | 0000ffeb-... | RGB LED control |
-| White Control | 0x0025 | 0000ffea-... | Warm/cold white control |
+| Characteristic | Handle | UUID | Function |
+|----------------|--------|------|----------|
+| Mode Control | 0x0020 | 01ff5554-ba5e-f4ee-5ca1-eb1e5e4b1ce0 | Power, mode selection (read, write, notify) |
+| White Control | 0x0024 | 01ff5556-ba5e-f4ee-5ca1-eb1e5e4b1ce0 | Warm/cold white control (read, write, notify) |
+| RGB Control | 0x0029 | 01ff5559-ba5e-f4ee-5ca1-eb1e5e4b1ce0 | RGB LED control (read, write, notify) |
+| Temperature | | 00002a6e-0000-1000-8000-00805f9b34fb | Internal temperature, notified about every 5 s |
 
-**Note**: UUIDs are estimated based on common patterns. Actual UUIDs may vary by device and should be validated using the characteristic enumeration feature in `test_discovery.py`.
+The UUIDs come from characteristic enumeration on a real lamp (LA-2017B,
+firmware 10); see `lampster/constants.py`. Noki's handles are one higher.
 
 ### Command Format
 
-**Mode Control** (1 byte):
-- `0xC0` - Power on
-- `0x40` - Power off
-- `0xA8` - RGB mode
-- `0xC8` - White mode
-- `0x28` - Off mode
+**Mode Control** (1 byte, a bit field):
+- Bit `0x80` is power, bit `0x20` is RGB (otherwise white)
+- `0xC8` white on, `0xA8` RGB on, `0x48` white off, `0x28` RGB off
+- `0xC0` power on and `0x40` power off are also accepted; `0xC0` is rejected
+  while already on, and mode writes are rejected while a previous mode change
+  is still being processed
+- The touch button turns off by clearing only the power bit, so the next tap
+  brings back the same mode and levels
+- A momentary tap toggles power; a slightly longer press counts as the start
+  of a hold, which in RGB mode first switches to white
+- A hold steps both white LEDs by the same amount, about 10 steps per second,
+  and stops when the weaker LED reaches 1 or the stronger reaches 100
 
 **RGB Control** (3 bytes):
 - Format: `[RR, GG, BB]`
@@ -273,21 +282,20 @@ Based on [Noki's documentation](https://github.com/Noki/the-lampster):
 ## Known Issues & Limitations
 
 ### Current Limitations
-1. **No state reading**: Device doesn't support reading current state
-   - State is tracked locally in the client
-   - Power cycles lose state synchronization
+1. **Writes are not confirmed**: The Lampster does not report writes made
+   over Bluetooth, so the entity assumes they succeeded
+   - The state is read again on every connection
 
-2. **Optimistic updates**: HA entity assumes commands succeed
-   - No verification from device
-   - Consider adding command confirmation
+2. **Advertising stops while connected**: The Lampster accepts one
+   connection and does not advertise while connected
 
 3. **Connection reliability**: BLE can be flaky
    - May need retry logic
    - Keep device close during operation
 
-4. **UUID variability**: Characteristic UUIDs may vary by device
-   - Validate UUIDs using test_discovery.py
-   - Update constants.py if needed
+4. **Touch-button holds**: the dimming range and color shift during a hold
+   come from the firmware (see Command Format); the integration leaves the
+   button's behavior to the firmware
 
 ### Future Improvements
 - [ ] Add automatic reconnection logic
@@ -317,8 +325,8 @@ Based on [Noki's documentation](https://github.com/Noki/the-lampster):
   - `ColorMode.COLOR_TEMP` - White temperature control
 
 - **State Management**:
-  - Optimistic updates (no read capability)
-  - Local state tracking
+  - State read on connection, then kept current by notifications
+  - Writes tracked locally (they are not reported back)
   - Available property based on connection status
 
 ### Integration Requirements
@@ -334,7 +342,7 @@ Based on [Noki's documentation](https://github.com/Noki/the-lampster):
 - Keep lamp within 2m of Bluetooth adapter
 - Check Bluetooth is enabled
 - Try power cycling the lamp
-- Check system Bluetooth isn't blocking scans
+- Check system Bluetooth is not blocking scans
 
 ### Connection Issues
 - Verify device address is correct
