@@ -519,10 +519,24 @@ const CONTROL_SHEET = `
   :host([lampster-slide]) .switch .background,
   :host([lampster-slide]) .switch:hover .background,
   :host([lampster-slide]) .switch:focus-visible .background { opacity: 0 !important; }
+  :host([lampster-slide]) { --control-switch-padding: 0px !important; }
+  :host([lampster-slide]) .switch { padding: 0 !important; }
   :host([lampster-slide]) .switch .button {
+    position: relative;
     background-color: var(--control-switch-on-color);
-    background-image: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%, rgba(0,0,0,.22));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 2px rgba(0,0,0,.3), 0 2px 3px rgba(0,0,0,.5);
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,.05) 40%, rgba(0,0,0,.05) 60%, rgba(0,0,0,.3));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.35),
+      inset 1px 0 0 rgba(255,255,255,.25), inset -1px 0 0 rgba(0,0,0,.25),
+      0 1px 2px rgba(0,0,0,.55);
+  }
+  /* The key that rides the rail: a recessed slot across the middle of the tab */
+  :host([lampster-slide]) .switch .button::after {
+    content: ""; position: absolute; left: 22%; right: 22%; top: 50%; height: 4px; margin-top: -2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.2));
+    box-shadow: 0 1px 0 rgba(255,255,255,.35);
   }
   :host([lampster-slide]) .switch .button ha-svg-icon,
   :host([lampster-slide]) .switch .button slot { display: none; }
@@ -584,6 +598,13 @@ class LampsterCard extends HTMLElement {
           box-shadow:
             inset 0 2px 3px rgba(0, 0, 0, .5), inset 0 1px 1px rgba(0, 0, 0, .35),
             inset 0 -1px 0 rgba(255, 255, 255, .25), 0 1px 0 rgba(255, 255, 255, .45);
+        }
+        /* A toggle's channel: a magnetic rail along its middle */
+        .channel.rail::before {
+          content: ""; position: absolute; left: 12%; right: 12%; top: 50%; height: 3px; margin-top: -1.5px;
+          border-radius: 2px;
+          background: linear-gradient(180deg, rgba(0, 0, 0, .55), rgba(60, 64, 70, .5) 60%, rgba(255, 255, 255, .25));
+          box-shadow: 0 1px 0 rgba(255, 255, 255, .2);
         }
       </style>
       <div class="frame">
@@ -764,9 +785,10 @@ class LampsterCard extends HTMLElement {
       for (const el of parts) {
         const keys = findDeep(el, "ha-favorite-color-button");
         swatches.push(...keys);
+        const slide = findDeep(el, "ha-control-switch").length > 0;
         for (const area of keys.length ? keys : [el]) {
           const b = box(area);
-          if (b) features.push({ ...b, radius: controlRadius(area, scale) });
+          if (b) features.push({ ...b, radius: controlRadius(area, scale), slide });
         }
         sliders.push(...findDeep(el, "ha-control-slider"));
         switches.push(...findDeep(el, "ha-control-switch"));
@@ -818,15 +840,18 @@ class LampsterCard extends HTMLElement {
     this._frame.classList.toggle("styled", !look.theme);
     const inset = featuresStyle === "inset";
     const pad = inset ? 3 : 0;
-    const areas = featuresStyle === "match" ? [] : controls.features.map((b) =>
-      ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: drawnRadius(b.radius + pad, b.w + 2 * pad, b.h + 2 * pad) }));
+    const areas = featuresStyle === "match" ? [] : controls.features.map((b) => {
+      // A toggle rides close in its channel, like a magnet on a rail
+      const gap = b.slide ? Math.min(pad, 1.5) : pad;
+      return { x: b.x - gap, y: b.y - gap, w: b.w + 2 * gap, h: b.h + 2 * gap, radius: drawnRadius(b.radius + gap, b.w + 2 * gap, b.h + 2 * gap), slide: b.slide };
+    });
     let texture = look.svg;
     if (areas.length && texture) {
       const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
       texture = `<defs><mask id="${p}clear"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs><g mask="url(#${p}clear)">${texture}</g>`;
     }
     root.getElementById("channels").innerHTML = !inset ? "" : areas.map((b) =>
-      `<div class="channel" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
+      `<div class="channel${b.slide ? " rail" : ""}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
     // Inset, the controls look physical: a slatted slider bar, color
     // favorites as keys, and the toggle as a slide
     for (const slider of controls.sliders) styleSlider(slider, inset);
