@@ -468,18 +468,23 @@ class LampsterClient:
         if not self._client or not self._client.is_connected:
             raise ConnectionError("Not connected to device")
 
+        # Raw bytes are logged because different MODE values parse to the same
+        # state (0x48 and 0x28 are both "off")
         def handle_mode(_char, data: bytearray) -> None:
+            _LOGGER.debug(f"MODE notification: {data.hex()}")
             if data:
                 is_on, mode = _parse_mode(data[0])
                 self._state = dataclasses.replace(self._state, is_on=is_on, mode=mode)
                 on_state(self._state)
 
         def handle_rgb(_char, data: bytearray) -> None:
+            _LOGGER.debug(f"RGB notification: {data.hex()}")
             if color := _parse_rgb(data):
                 self._state = dataclasses.replace(self._state, rgb_color=color)
                 on_state(self._state)
 
         def handle_white(_char, data: bytearray) -> None:
+            _LOGGER.debug(f"WHITE notification: {data.hex()}")
             if color := _parse_white(data):
                 self._state = dataclasses.replace(self._state, white_color=color)
                 on_state(self._state)
