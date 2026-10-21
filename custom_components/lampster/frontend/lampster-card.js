@@ -6,7 +6,7 @@
  * - a style (finish) drawn behind the tile card, with a raised edge,
  * - fasteners drawn on top of it, clear of the icon and the controls,
  * - the features (such as the brightness slider) on the style, on a flat
- *   patch of it, or in a channel pressed into the panel, and
+ *   patch of it, or inset in a channel pressed into the panel, and
  * - a picture of The Lampster's head in place of the tile card's icon, shown
  *   through the tile card's own "show entity picture" option. The light's
  *   color fills the lens. The picture is built in memory; no files are written.
@@ -58,7 +58,7 @@ const RANDOMIZED = (style) =>
 
 // "match" is written out and labeled "Match style" wherever it is offered
 const MATCH = ["match", "Match style"];
-const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["channel", "Channel"]];
+const FEATURES_STYLES = [MATCH, ["flat", "Flat"], ["inset", "Inset"]];
 
 const FASTENERS = [["rivets", "Rivets"], ["phillips", "Phillips"], ["hex", "Hex"], ["socket", "Socket"], ["none", "None"]];
 /**
@@ -347,9 +347,8 @@ function fastenerSymbols(p) {
 }
 
 /**
- * Where the fasteners go, and how many of them (from the start of the list)
- * always stay. Every fastener is the same distance (inset) from its nearest
- * edge; the corner ones are measured from the rounded corner.
+ * Where the fasteners go. Every fastener is the same distance (inset) from
+ * its nearest edge; the corner ones are measured from the rounded corner.
  *
  * Spacing 0 is corners only; otherwise each long edge is divided into
  * "spacing" gaps, and each short edge is halved again whenever the long-edge
@@ -364,11 +363,11 @@ function fastenerPositions(spacing, W, H, radius, inset, ends) {
     const points = [[inset, H / 2], [W - inset, H / 2]];
     const gap = (W - 2 * inset) / Math.max(spacing, 1);
     for (let i = 1; i < spacing; i++) points.push([inset + i * gap, inset], [inset + i * gap, H - inset]);
-    return { points, fixed: 2 };
+    return points;
   }
   const c = radius - (radius - inset) / Math.SQRT2;
   const points = [[c, c], [W - c, c], [c, H - c], [W - c, H - c]];
-  if (!spacing) return { points, fixed: 4 };
+  if (!spacing) return points;
   const wide = W >= H;
   const long = wide ? W : H, short = wide ? H : W;
   const L = long - 2 * c, S = short - 2 * c, gap = L / spacing;
@@ -383,7 +382,7 @@ function fastenerPositions(spacing, W, H, radius, inset, ends) {
     add(inset, c + (i * S) / shortParts);
     add(long - inset, c + (i * S) / shortParts);
   }
-  return { points, fixed: 4 };
+  return points;
 }
 
 // The Lampster icon (the integration's icon): housing outline, top ridge,
@@ -435,27 +434,33 @@ function findDeep(el, selector, depth = 5) {
 // theme's "pill" radius (such as 9999px) draws as a half circle
 const drawnRadius = (radius, w, h) => Math.max(0, Math.min(radius, w / 2, h / 2));
 
-// The corner radius of a feature's control, as drawn: the roundest element
-// inside it (through its shadow roots) that is about the feature's size
-function controlRadius(feature, b) {
+// The corner radius of a control, as drawn, in the card's own pixels: the
+// roundest element inside it (through its shadow roots) that is about its
+// size. Sizes on screen are divided by the scale (the editor preview zooms);
+// the radius from the style is already in the card's own pixels.
+function controlRadius(el, scale) {
+  const outer = el.getBoundingClientRect();
   let found = 0;
-  let stack = [feature];
+  let stack = [el];
   for (let depth = 0; depth < 6 && stack.length; depth++) {
     const next = [];
-    for (const el of stack) {
-      for (const child of el.shadowRoot ? el.shadowRoot.querySelectorAll("*") : []) {
+    for (const node of stack) {
+      for (const child of node.shadowRoot ? node.shadowRoot.querySelectorAll("*") : []) {
         const r = child.getBoundingClientRect();
-        if (Math.abs(r.width - b.w) < 3 && Math.abs(r.height - b.h) < 3) {
+        if (Math.abs(r.width - outer.width) < 3 * scale && Math.abs(r.height - outer.height) < 3 * scale) {
           const radius = parseFloat(getComputedStyle(child).borderTopLeftRadius) || 0;
-          found = Math.max(found, drawnRadius(radius, r.width, r.height));
+          found = Math.max(found, drawnRadius(radius, r.width / scale, r.height / scale));
         }
         if (child.shadowRoot) next.push(child);
       }
     }
     stack = next;
   }
-  return found || drawnRadius(12, b.w, b.h);
+  return found || drawnRadius(12, outer.width / scale, outer.height / scale);
 }
+
+// A color as [red, green, blue], from a CSS color such as "rgb(1, 2, 3)"
+const rgbOf = (css) => (css.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
 
 /**
  * A slider in a channel: the unused part shows the channel's floor, and
@@ -489,6 +494,49 @@ function styleSlider(slider, on) {
   // gradient) keeps its look inside the channel
   const opacity = parseFloat(getComputedStyle(slider).getPropertyValue("--control-slider-background-opacity"));
   slider.toggleAttribute("lampster-channel", on && !(opacity >= 1));
+}
+
+/**
+ * Inset styling for other controls, by an attribute on the control: color
+ * favorites as 3D keys that press in when touched (and stay in while they
+ * match the light), and the toggle as a slide whose tab is beveled and
+ * whose off side shows the channel's floor. Like the slider, this styles
+ * parts inside Home Assistant's controls; if an update renames them, they
+ * keep their usual look.
+ */
+const CONTROL_SHEET = `
+  :host([lampster-key]) button {
+    background-image: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%, rgba(0,0,0,.18));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 2px rgba(0,0,0,.3), 0 2px 3px rgba(0,0,0,.5);
+    transition: transform 120ms ease-in-out, box-shadow 120ms ease-in-out;
+  }
+  :host([lampster-key]) button:active,
+  :host([lampster-key][lampster-pressed]) button {
+    transform: translateY(1px) scale(.96);
+    background-image: linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0) 55%, rgba(255,255,255,.08));
+    box-shadow: inset 0 2px 4px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.2);
+  }
+  :host([lampster-slide]) .switch .background,
+  :host([lampster-slide]) .switch:hover .background,
+  :host([lampster-slide]) .switch:focus-visible .background { opacity: 0 !important; }
+  :host([lampster-slide]) .switch .button {
+    background-color: var(--control-switch-on-color);
+    background-image: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 45%, rgba(0,0,0,.22));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 2px rgba(0,0,0,.3), 0 2px 3px rgba(0,0,0,.5);
+  }
+  :host([lampster-slide]) .switch .button ha-svg-icon,
+  :host([lampster-slide]) .switch .button slot { display: none; }
+`;
+let controlSheet;
+function styleControl(control, attribute, on) {
+  const root = control.shadowRoot;
+  if (!root) return;
+  if (!controlSheet) {
+    controlSheet = new CSSStyleSheet();
+    controlSheet.replaceSync(CONTROL_SHEET);
+  }
+  if (!root.adoptedStyleSheets.includes(controlSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, controlSheet];
+  control.toggleAttribute(attribute, on);
 }
 
 // ---------------------------------------------------------------------------
@@ -601,6 +649,20 @@ class LampsterCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this._tile) this._tile.hass = this._innerHass(hass);
+    this._markPressed();
+  }
+
+  // Inset: the color favorite matching the light's current color stays pressed
+  _markPressed() {
+    if (!this._swatches?.length) return;
+    const stateObj = this._hass?.states[this._config?.entity];
+    const current = stateObj?.state === "on" ? stateObj.attributes.rgb_color : null;
+    for (const swatch of this._swatches) {
+      const inner = swatch.shadowRoot?.querySelector("button");
+      const color = inner ? rgbOf(getComputedStyle(inner).backgroundColor) : [];
+      const match = Array.isArray(current) && color.length === 3 && color.every((v, i) => Math.abs(v - current[i]) <= 6);
+      swatch.toggleAttribute("lampster-pressed", match);
+    }
   }
 
   get hass() {
@@ -668,7 +730,7 @@ class LampsterCard extends HTMLElement {
    */
   _controls() {
     const root = this._tile?.shadowRoot;
-    if (!root) return { icon: [], features: [], sliders: [] };
+    if (!root) return { icon: [], features: [], sliders: [], swatches: [], switches: [] };
     // Positions in the card's own pixels, even while the card is scaled
     // (the card editor's preview opens with a zoom animation)
     const origin = this._frame.getBoundingClientRect();
@@ -689,23 +751,29 @@ class LampsterCard extends HTMLElement {
       this._watched.add(group);
       this._resize.observe(group);
     }
-    // Each feature; a group whose features cannot be told apart counts as one.
-    // A feature's corner radius is its control's (such as the slider's), so
-    // a channel around it can follow the same curve.
+    // The areas the features take: each feature, except that each color
+    // favorite counts on its own (so the style shows between them); a group
+    // whose features cannot be told apart counts as one. An area's corner
+    // radius is its control's, so an inset around it follows the same curve.
     const features = [];
     const sliders = [];
+    const swatches = [];
+    const switches = [];
     for (const group of groups) {
       const parts = [...(group.shadowRoot?.querySelectorAll("hui-card-feature") ?? [])];
-      const each = parts.map((el) => {
-        const b = box(el);
-        if (b) b.radius = controlRadius(el, b) / scale;
-        return b;
-      }).filter(Boolean);
-      if (each.length) features.push(...each);
-      else features.push(...[box(group)].filter(Boolean).map((b) => ({ ...b, radius: 12 })));
-      sliders.push(...parts.flatMap((el) => findDeep(el, "ha-control-slider")));
+      for (const el of parts) {
+        const keys = findDeep(el, "ha-favorite-color-button");
+        swatches.push(...keys);
+        for (const area of keys.length ? keys : [el]) {
+          const b = box(area);
+          if (b) features.push({ ...b, radius: controlRadius(area, scale) });
+        }
+        sliders.push(...findDeep(el, "ha-control-slider"));
+        switches.push(...findDeep(el, "ha-control-switch"));
+      }
+      if (!parts.length) features.push(...[box(group)].filter(Boolean).map((b) => ({ ...b, radius: 12 })));
     }
-    return { icon: find("ha-tile-icon, ha-tile-info"), features, sliders };
+    return { icon: find("ha-tile-icon, ha-tile-info"), features, sliders, swatches, switches };
   }
 
   /**
@@ -744,11 +812,12 @@ class LampsterCard extends HTMLElement {
     const root = this.shadowRoot;
 
     // The features: on the style itself, on a flat patch of the style's base
-    // (no rust, wear or splatter), or in a channel pressed into the panel.
-    // The channel's corners are concentric with the feature's.
+    // (no rust, wear or splatter), or inset in a channel pressed into the
+    // panel. The channel's corners are concentric with the feature's.
     const featuresStyle = look.theme ? "match" : this._config.features_style;
     this._frame.classList.toggle("styled", !look.theme);
-    const pad = featuresStyle === "channel" ? 3 : 0;
+    const inset = featuresStyle === "inset";
+    const pad = inset ? 3 : 0;
     const areas = featuresStyle === "match" ? [] : controls.features.map((b) =>
       ({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad, radius: drawnRadius(b.radius + pad, b.w + 2 * pad, b.h + 2 * pad) }));
     let texture = look.svg;
@@ -756,11 +825,15 @@ class LampsterCard extends HTMLElement {
       const holes = areas.map((b) => `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.radius}" fill="black" filter="url(#${p}edgeSoft)"/>`).join("");
       texture = `<defs><mask id="${p}clear"><rect width="100%" height="100%" fill="white"/>${holes}</mask></defs><g mask="url(#${p}clear)">${texture}</g>`;
     }
-    root.getElementById("channels").innerHTML = featuresStyle !== "channel" ? "" : areas.map((b) =>
+    root.getElementById("channels").innerHTML = !inset ? "" : areas.map((b) =>
       `<div class="channel" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;border-radius:${b.radius}px"></div>`).join("");
-    // In a channel, sliders look like a physical slide: a textured bar with a
-    // grip, running over the channel's own floor
-    for (const slider of controls.sliders) styleSlider(slider, featuresStyle === "channel");
+    // Inset, the controls look physical: a slatted slider bar, color
+    // favorites as keys, and the toggle as a slide
+    for (const slider of controls.sliders) styleSlider(slider, inset);
+    for (const swatch of controls.swatches) styleControl(swatch, "lampster-key", inset);
+    for (const toggle of controls.switches) styleControl(toggle, "lampster-slide", inset);
+    this._swatches = inset ? controls.swatches : [];
+    this._markPressed();
     root.getElementById("bg").style.background = look.bg;
     root.getElementById("texture").innerHTML = `<defs>${textureFilters(p, this._config.pattern)}</defs>${texture}`;
     root.getElementById("gloss").style.background = look.gloss ? GLOSS : "none";
@@ -769,39 +842,20 @@ class LampsterCard extends HTMLElement {
       this._tile.classList.toggle("dark", look.tone === "dark");
     }
 
-    // Fasteners: smaller on a single-row card; any along the edges that would
-    // touch the icon or the controls are left out (the corners or ends stay)
+    // Fasteners: smaller on a single-row card; none is ever left out
     const { fasteners } = this._config;
     const { gaps: spacing, ends: atEnds } = parseSpacing(this._config.fastener_spacing);
     let markup = "";
     if (fasteners !== "none") {
       const compact = H < 80;  // a single row
-      // A channel takes room around the features: move the fasteners outward
-      const inset = (compact ? 5 : 7) - (featuresStyle === "channel" ? 1.5 : 0);
+      // An inset takes room around the features: move the fasteners outward
+      const edge = (compact ? 5 : 7) - (inset ? 1.5 : 0);
       const size = fasteners === "rivets" ? (compact ? 6.5 : 8) : (compact ? 7.5 : 9.5);
       const color = this._config.fastener_color === "match" ? look.metal : resolveColor(this._config.fastener_color, this, look.metal);
       const radius = drawnRadius(parseFloat(getComputedStyle(this._frame).borderTopLeftRadius) || 12, W, H);
-      // Clear of the head and the features themselves; with the fasteners
-      // moved outward, they fit in the gap beside a channel
-      const avoid = [...controls.icon, ...controls.features];
-      const clear = (x, y) => avoid.every((b) => {
-        const nx = Math.max(b.x, Math.min(x, b.x + b.w)), ny = Math.max(b.y, Math.min(y, b.y + b.h));
-        return Math.hypot(x - nx, y - ny) > size / 2 + (compact ? 0.5 : 1.5);
-      });
-      const ends = compact && atEnds;
-      const { points, fixed } = fastenerPositions(spacing, W, H, radius, inset, ends);
+      const points = fastenerPositions(spacing, W, H, radius, edge, compact && atEnds);
       markup = `<defs>${fastenerSymbols(p)}</defs>` +
         points
-          .filter(([x, y], i, all) => {
-            if (i < fixed) return true;
-            // After the fixed ones, fasteners come in mirrored pairs. The top
-            // and bottom rows always stay, so they always match; a pair on the
-            // left and right ends is left out only if one would touch the
-            // head or a feature
-            const mate = all[fixed + ((i - fixed) ^ 1)];
-            if (!mate || Math.abs(mate[0] - x) < 0.5) return true;
-            return clear(x, y) && clear(mate[0], mate[1]);
-          })
           .map(([x, y], i) =>
             `<use href="#${p}${fasteners}" color="${color}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"` +
             ` transform="rotate(${fasteners === "rivets" ? 0 : (i * 37) % 90} ${x} ${y})"/>`).join("");
