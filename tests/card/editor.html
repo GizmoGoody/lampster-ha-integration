@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Lampster card: editor</title>
+<style>
+  body { margin: 0; padding: 16px; background: #120b19; color: #ddd; font: 13px Roboto, "Segoe UI", sans-serif; }
+  pre { white-space: pre-wrap; }
+</style>
+<script src="stand-ins.js"></script>
+<script src="../../custom_components/lampster/frontend/lampster-card.js"></script>
+<div id="cards"></div>
+<pre id="report" data-result="running">running</pre>
+<script>
+  // The editor: written-out options, the tile card's own editor with the
+  // overridden options left out, and settings that keep an E from YAML
+  const problems = [], passed = [];
+  window.addEventListener("error", (ev) => problems.push(`Page error: ${ev.message}`));
+  window.addEventListener("unhandledrejection", (ev) => problems.push(`Unhandled promise rejection: ${ev.reason}`));
+  const check = (ok, message) => (ok ? passed : problems).push(message);
+
+  (async () => {
+    const editor = document.createElement("lampster-card-editor");
+    const events = [];
+    editor.addEventListener("config-changed", (ev) => events.push(ev.detail.config));
+    editor.hass = makeHass();
+    document.body.append(editor);
+
+    // Opening a card with options left out writes them out, "match" included
+    editor.setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", features: [{ type: "light-brightness" }] });
+    const written = events.at(-1) ?? {};
+    check(written.style === "polished", `style written out (${written.style})`);
+    check(written.features_style === "match", `features_style written out as match (${written.features_style})`);
+    check(written.fastener_color === "match", `fastener_color written out as match (${written.fastener_color})`);
+    check(written.fastener_spacing === 4, `fastener_spacing written out (${written.fastener_spacing})`);
+
+    // The tile card's editor is used, without Icon and Show entity picture
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const tileEditor = editor.shadowRoot.querySelector("lampster-tile-card-editor, hui-tile-card-editor");
+    check(Boolean(tileEditor), "the tile card's editor is shown");
+    const names = tileEditor?.schemaNames ?? "";
+    check(!names.includes('"icon"') && !names.includes('"show_entity_picture"'), "Icon and Show entity picture are left out");
+    check(names.includes('"color"') && names.includes('"hide_state"'), "the other tile card options stay");
+    check(!("show_entity_picture" in (tileEditor?.config ?? {})) || tileEditor.config.show_entity_picture === true, "the head stays on");
+
+    // A spacing with an E (YAML only) shows as the fraction and keeps its E
+    events.length = 0;
+    editor.setConfig({ ...written, fastener_spacing: "8E" });
+    const form = editor.shadowRoot.getElementById("fasteners");
+    check(form.data?.fastener_spacing === "8", `8E shows as 1/8 in the editor (${form.data?.fastener_spacing})`);
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, fastener_spacing: "16" } } }));
+    check(events.at(-1)?.fastener_spacing === "16E", `changing the spacing keeps the E (${events.at(-1)?.fastener_spacing})`);
+
+    // Invalid settings show a clear error on the card
+    for (const [bad, expected] of [[{ style: "nope" }, "Unknown style"], [{ fastener_spacing: 3 }, "fastener_spacing"], [{ features_style: "channel" }, "features_style"]]) {
+      try {
+        document.createElement("lampster-card").setConfig({ type: "custom:lampster-card", entity: "light.the_lampster", ...bad });
+        check(false, `no error for ${JSON.stringify(bad)}`);
+      } catch (err) {
+        check(err.message.includes(expected), `error for ${JSON.stringify(bad)}: ${err.message}`);
+      }
+    }
+
+    const report = document.getElementById("report");
+    report.dataset.result = problems.length ? "fail" : "pass";
+    report.textContent = [...problems.map((p) => `FAIL ${p}`), ...passed.map((p) => `ok   ${p}`)].join("\n");
+  })().catch((err) => {
+    const report = document.getElementById("report");
+    report.dataset.result = "fail";
+    report.textContent = `FAIL ${err.stack || err}`;
+  });
+</script>

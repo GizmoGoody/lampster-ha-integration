@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Lampster card: styles and fasteners</title>
+<style>
+  body { margin: 0; padding: 16px; background: #120b19; color: #ddd; font: 13px Roboto, "Segoe UI", sans-serif; }
+  #cards { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+  figure { margin: 0; } figcaption { margin-bottom: 4px; color: #aaa; }
+  pre { white-space: pre-wrap; }
+</style>
+<script src="stand-ins.js"></script>
+<script src="../../custom_components/lampster/frontend/lampster-card.js"></script>
+<script src="checks.js"></script>
+<div id="cards"></div>
+<pre id="report" data-result="running">running</pre>
+<script>
+  const brightness = [{ type: "light-brightness" }];
+  // Every style, on a two-row card with the brightness slider
+  const styles = ["none", "polished", "brushed", "rusted", "painted",
+    ...["black", "blue", "gold", "green", "red", "white"].map((c) => `army_${c}`),
+    ...["black", "gold", "green", "red", "white"].map((c) => `artsy_${c}`),
+    ...["black", "blue", "gold", "green", "red"].map((c) => `color_${c}`)];
+  for (const style of styles) addCard(style, { style, features: brightness, fastener_spacing: 8, pattern: 4242 });
+  // Fasteners and spacing, including ends (E) on single-row cards
+  for (const fasteners of ["rivets", "phillips", "hex", "socket", "none"]) {
+    addCard(`fasteners ${fasteners}`, { style: "polished", fasteners, fastener_spacing: 16, features: brightness });
+  }
+  for (const spacing of [0, 2, 4, 8, 16, 32, 64, "0E", "8E"]) {
+    addCard(`single row, spacing ${spacing}`, { style: "rusted", fastener_spacing: spacing, features: brightness, features_position: "inline" }, { height: 56 });
+  }
+  // Features styles on single-row and two-row cards
+  for (const features_style of ["match", "flat", "inset"]) {
+    addCard(`single row, ${features_style}`, { style: "army_green", features_style, features: brightness, features_position: "inline" }, { height: 56 });
+    addCard(`two rows, ${features_style}`, { style: "artsy_white", features_style, features: brightness });
+  }
+  // Fastener colors: match, a theme color and a CSS color
+  for (const fastener_color of ["match", "amber", "#7a1f5c"]) {
+    addCard(`fastener color ${fastener_color}`, { style: "color_blue", fastener_color, features: brightness });
+  }
+  runChecks();
+</script>
