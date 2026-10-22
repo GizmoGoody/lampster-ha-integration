@@ -23,7 +23,7 @@ from custom_components.lampster.coordinator import (
     STATE_UPDATE_BATCH_DELAY,
     LampsterCoordinator,
 )
-from custom_components.lampster.lampster.models import RGBColor, WhiteColor
+from custom_components.lampster.lampster.models import LampState, RGBColor, WhiteColor
 
 from .conftest import ADDRESS, FakeBleakClient, FakeLamp
 
@@ -230,7 +230,8 @@ async def test_breathe_from_off_uses_last_color(
     """Breathe started from off breathes the last color, which Home Assistant shows."""
     coordinator = make_coordinator(always_connected=True)
     await coordinator.async_command("set_rgb_color", RGBColor(60, 0, 0))
-    await coordinator.async_command("power_off")
+    # Turned off (as The Lampster reports it): no mode or color while off
+    coordinator._async_set_state(LampState(is_on=False, mode="off"), batch=False)
     assert coordinator.data.is_on is False
 
     await coordinator.async_start_effect("breathe", 255)
