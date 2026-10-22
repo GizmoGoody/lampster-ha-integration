@@ -4,12 +4,12 @@ Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model
 
 ## Status of this fork
 
-*Last updated: 2026-10-21*
+*Last updated: 2026-10-22*
 
 This is GizmoGoody's fork of [yamanote1138/lampster-ha-integration](https://github.com/yamanote1138/lampster-ha-integration). It is maintained on its own and is well ahead of the original:
 
-- **Install from this fork.** Version 1.2.0, released from the `stable` branch (the default), has every finished fix and feature below. Each one was tested on its own branch on GitHub, then merged.
-- **The original repository** has version 1.0.1. [Pull request #2](https://github.com/yamanote1138/lampster-ha-integration/pull/2) (version 1.1.0: the setup fix for issue #1, instant touch-button sync, effects, transitions, diagnostics and repairs) was opened on 2026-09-27 and has not been reviewed yet. Each change listed below is offered to the original repository as its own pull request too.
+- **Install from this fork.** Version 1.2.1, released from the `stable` branch (the default), has every finished fix and feature below. Each one was tested on its own branch on GitHub, then merged.
+- **The original repository** has version 1.0.1. [Pull request #2](https://github.com/yamanote1138/lampster-ha-integration/pull/2) (version 1.1.0: the setup fix for issue #1, instant touch-button sync, effects, transitions, diagnostics and repairs) was opened on 2026-09-27 and has not been reviewed yet. Each change listed below is offered to the original repository as its own pull request too (#3 to #23, all waiting on #2).
 - **Protocol notes** are offered to Noki's protocol documentation in [Noki/the-lampster pull request #3](https://github.com/Noki/the-lampster/pull/3) (opened on 2026-10-21).
 - **The Lampster's icon** was added to [custom-brand-icons](https://github.com/elax46/custom-brand-icons) on 2026-10-10.
 
@@ -17,6 +17,9 @@ What `stable` adds to version 1.1.0, newest first:
 
 | Date | Change |
 | --- | --- |
+| 2026-10-22 | Version 1.2.1 |
+| 2026-10-22 | Breathe follows the light: it peaks at the brightness, breathes the last color when started from off, and restarts in a color or white chosen while it runs |
+| 2026-10-22 | Start effect takes a color for Breathe; a Stop effect action; Off is no longer in Start effect's list |
 | 2026-10-21 | Version 1.2.0: the fork's releases now come from `stable`, so HACS offers everything below |
 | 2026-10-21 | The Lampster shows as on while an effect runs, also when the effect was started from off |
 | 2026-10-09 | The Lampster card for dashboards: a tile card in metal or The Lampster's own finishes, with fasteners, a lens that shows the light's color, and Match, Flat or Console controls |
