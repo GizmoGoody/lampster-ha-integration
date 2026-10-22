@@ -26,7 +26,7 @@ from custom_components.lampster.coordinator import (
     STATE_UPDATE_BATCH_DELAY,
     LampsterCoordinator,
 )
-from custom_components.lampster.lampster.models import RGBColor, WhiteColor
+from custom_components.lampster.lampster.models import LampState, RGBColor, WhiteColor
 from custom_components.lampster.light import LampsterLight
 
 from .conftest import ADDRESS, FakeBleakClient, FakeLamp
@@ -226,6 +226,51 @@ async def test_transition_off_fades_then_powers_off(
     await coordinator._task
     assert lamp.mode & 0x80 == 0
     assert coordinator.data.is_on is False
+
+
+async def test_breathe_from_off_uses_last_color(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Breathe started from off breathes the last color, which Home Assistant shows."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_rgb_color", RGBColor(60, 0, 0))
+    # Turned off (as The Lampster reports it): no mode or color while off
+    coordinator._async_set_state(LampState(is_on=False, mode="off"), batch=False)
+    assert coordinator.data.is_on is False
+
+    await coordinator.async_start_effect("breathe", 255)
+    await asyncio.sleep(1)
+    assert lamp.mode & 0x20  # color mode
+    red, green, blue = lamp.rgb
+    assert red > 0 and green == 0 and blue == 0
+    await coordinator.async_stop_effect()
+
+
+async def test_color_change_during_breathe(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A color chosen while Breathe runs restarts it in that color; other effects stop."""
+    coordinator = make_coordinator(always_connected=True)
+    light = LampsterLight(coordinator)
+    coordinator.effect = "breathe"
+    with patch.object(coordinator, "async_start_effect") as start:
+        await light.async_turn_on(rgb_color=(0, 0, 255), brightness=255)
+        start.assert_awaited_once()
+        effect = start.await_args.args[0]
+        state = start.await_args.kwargs.get("start", start.await_args.args[-1])
+        assert effect == "breathe"
+        assert state.mode == "rgb" and state.rgb_color == RGBColor(0, 0, 100)
+
+        start.reset_mock()
+        await light.async_turn_on(color_temp_kelvin=2700, brightness=255)
+        effect = start.await_args.args[0]
+        state = start.await_args.kwargs.get("start", start.await_args.args[-1])
+        assert state.mode == "white" and state.white_color.warm == 100
+
+        start.reset_mock()
+        coordinator.effect = "colorloop"
+        await light.async_turn_on(rgb_color=(0, 0, 255))
+        start.assert_not_awaited()  # any other effect stops for a color
 
 
 async def test_effect_stopped_by_command(

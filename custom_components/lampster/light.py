@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from .lampster.models import RGBColor, WhiteColor
+from .lampster.models import LampState, RGBColor, WhiteColor
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -32,6 +32,7 @@ from homeassistant.helpers.entity_platform import (
 from .const import DOMAIN, SERVICE_START_EFFECT, SERVICE_STOP_EFFECT
 from .coordinator import COMMAND_ERRORS, LampsterCoordinator
 from .effects import (
+    EFFECT_BREATHE,
     EFFECT_SPEED_MAX,
     EFFECT_SPEED_MIN,
     EFFECTS,
@@ -284,6 +285,33 @@ class LampsterLight(LampsterEntity, LightEntity):
             effect = self.coordinator.effect
 
         try:
+            if (
+                effect is None
+                and self.coordinator.effect == EFFECT_BREATHE
+                and (ATTR_RGB_COLOR in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs)
+            ):
+                # Color change while Breathe runs: breathe the new color
+                if ATTR_RGB_COLOR in kwargs:
+                    start = LampState(
+                        True, MODE_RGB, _rgb_to_device(kwargs[ATTR_RGB_COLOR], brightness)
+                    )
+                else:
+                    start = LampState(
+                        True,
+                        MODE_WHITE,
+                        None,
+                        self._white_request(kwargs[ATTR_COLOR_TEMP_KELVIN], brightness),
+                    )
+                # It keeps the speed it was started with; the new color
+                # replaces one an action gave it
+                await self.coordinator.async_start_effect(
+                    EFFECT_BREATHE,
+                    brightness,
+                    self.coordinator.effect_speed_override,
+                    start=start,
+                )
+                return
+
             if effect in EFFECTS:
                 # Restarting the running effect keeps the speed and color it
                 # was started with

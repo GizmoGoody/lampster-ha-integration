@@ -203,6 +203,10 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
         if max(peak) == 0:
             # Nothing showing yet: breathe in warm white or white light
             peak = (level, 0) if mode == MODE_WHITE else (level, level, level)
+        else:
+            # The current color at the effect's brightness, so a brightness
+            # change while it runs changes how bright it breathes
+            peak = tuple(v / max(peak) * level for v in peak)
         t = 0.0
         while True:
             factor = BREATHE_MIN + (1 - BREATHE_MIN) * (

@@ -7,6 +7,7 @@ import random
 import pytest
 
 from custom_components.lampster.effects import (
+    EFFECT_BREATHE,
     EFFECT_CANDLE,
     EFFECTS,
     MODE_RGB,
@@ -150,6 +151,37 @@ def test_scale_steps_speed() -> None:
     assert [s.delay for s in scale_steps(iter(steps), 200)] == [0.5, 0.1, 0.08]
     assert [s.delay for s in scale_steps(iter(steps), 25)] == [4.0, 0.6, 0.32]
     assert [s.color for s in scale_steps(iter(steps), 50)] == [s.color for s in steps]
+
+
+@pytest.mark.parametrize("effect", [effect for effect in EFFECTS if effect != "fireworks"])
+def test_effects_peak_at_their_brightness(effect: str) -> None:
+    """Each effect (Fireworks keeps its own) peaks at the brightness it runs at.
+
+    A brightness change while an effect runs restarts it at the new
+    brightness, so this is what makes the change show.
+    """
+    state = LampState(True, "rgb", RGBColor(50, 20, 0), WhiteColor(30, 0))
+    for brightness in (255, 128):
+        level = brightness / 255 * 100
+        steps = itertools.islice(effect_steps(effect, brightness, state), 300)
+        peak = max(max(color_values(step.color)) for step in steps if step.color is not None)
+        assert 0.8 * level <= peak <= round(level)
+
+
+def test_breathe_follows_brightness() -> None:
+    """Breathe keeps the current color but peaks at the effect's brightness."""
+    state = LampState(True, "rgb", RGBColor(40, 20, 0), None)
+    for brightness, top in ((255, 100), (51, 20)):
+        steps = list(itertools.islice(effect_steps(EFFECT_BREATHE, brightness, state), 100))
+        reds = [step.color.red for step in steps]
+        greens = [step.color.green for step in steps]
+        assert max(reds) == top
+        assert max(greens) == top // 2  # same color
+
+    white = LampState(True, "white", None, WhiteColor(30, 10))
+    steps = list(itertools.islice(effect_steps(EFFECT_BREATHE, 255, white), 100))
+    assert max(step.color.warm for step in steps) == 100
+    assert max(step.color.cold for step in steps) in (33, 34)
 
 
 def test_effect_modes() -> None:

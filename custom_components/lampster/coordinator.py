@@ -208,6 +208,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The running effect's own color (0-255 RGB at full brightness) when
         # an action started it with one
         self.effect_color: tuple[int, int, int] | None = None
+        # The last state The Lampster was on in: while it is off its state has
+        # no mode or color, but Home Assistant still shows these
+        self._last_on: LampState | None = None
 
         # Diagnostics
         self.last_connect_ms: int | None = None
@@ -744,6 +747,8 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         was_on = bool(self.data and self.data.is_on)
         self.data = dataclasses.replace(state)
         self._reported = self.data
+        if state.is_on:
+            self._last_on = self.data
 
         if self.connected and apply_policy:
             if self._should_stay_connected():
@@ -783,17 +788,22 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         brightness: int,
         speed: int | None = None,
         color: tuple[int, int, int] | None = None,
+        start: LampState | None = None,
     ) -> None:
         """Start a software effect at a brightness (0-255).
 
         Runs at the given speed (percent), or else at effect_speed. An effect
         in EFFECTS_WITH_COLOR shows color (0-255 RGB) when one is given, or
+        else start when given (for example a color chosen while it runs), or
         else the color The Lampster shows now.
         """
         await self._async_stop_task()
         if effect not in EFFECTS_WITH_COLOR:
             color = None
-        start = self.data
+        if start is None:
+            # Started from off, it uses the last color, which Home Assistant
+            # still shows
+            start = self.data if self.data and self.data.is_on else self._last_on
         if color is not None:
             start = LampState(
                 is_on=True,
@@ -813,8 +823,10 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The effect's writes are not reported, so The Lampster would still
         # show as off when an effect is started from off; it is on in the
         # effect's mode until the effect stops
+        # Its colors are the ones the effect started from, so a restart (a
+        # brightness or speed change) starts from the same color
         self.data = dataclasses.replace(
-            self.data or LampState(is_on=True, mode=mode), is_on=True, mode=mode
+            start or self.data or LampState(is_on=True, mode=mode), is_on=True, mode=mode
         )
         self._async_start_task(mode, steps, f"effect {effect}")
         self._record(f"Started effect {effect} at {speed or self.effect_speed}% speed")
