@@ -6,6 +6,7 @@ import itertools
 import pytest
 
 from custom_components.lampster.effects import (
+    EFFECT_BREATHE,
     EFFECT_CANDLE,
     EFFECTS,
     MODE_RGB,
@@ -52,6 +53,22 @@ def test_effect_steps_are_valid(effect: str) -> None:
     for step in itertools.islice(effect_steps(effect, 200, state), 200):
         assert step.delay > 0
         assert all(0 <= value <= 100 for value in color_values(step.color))
+
+
+def test_breathe_follows_brightness() -> None:
+    """Breathe keeps the current color but peaks at the effect's brightness."""
+    state = LampState(True, "rgb", RGBColor(40, 20, 0), None)
+    for brightness, top in ((255, 100), (51, 20)):
+        steps = list(itertools.islice(effect_steps(EFFECT_BREATHE, brightness, state), 100))
+        reds = [step.color.red for step in steps]
+        greens = [step.color.green for step in steps]
+        assert max(reds) == top
+        assert max(greens) == top // 2  # same color
+
+    white = LampState(True, "white", None, WhiteColor(30, 10))
+    steps = list(itertools.islice(effect_steps(EFFECT_BREATHE, 255, white), 100))
+    assert max(step.color.warm for step in steps) == 100
+    assert max(step.color.cold for step in steps) in (33, 34)
 
 
 def test_effect_modes() -> None:
