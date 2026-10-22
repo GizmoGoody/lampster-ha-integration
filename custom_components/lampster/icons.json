@@ -62,6 +62,9 @@
   "services": {
     "start_effect": {
       "service": "mdi:creation"
+    },
+    "stop_effect": {
+      "service": "mdi:stop-circle-outline"
     }
   }
 }

@@ -36,6 +36,8 @@ EFFECTS = (
     EFFECT_SPIN_CCW,
     EFFECT_SPIN_ALTERNATING,
 )
+# Effects that show a color they are given (the others have their own colors)
+EFFECTS_WITH_COLOR = (EFFECT_BREATHE,)
 
 MODE_RGB = "rgb"
 MODE_WHITE = "white"
