@@ -15,5 +15,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/GizmoGoody/lampster-ha-integration/issues",
   "requirements": ["bleak>=0.21.0", "bleak-retry-connector>=3.5.0"],
-  "version": "1.2.0"
+  "version": "1.2.1"
 }

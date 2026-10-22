@@ -1,6 +1,6 @@
 [project]
 name = "lampster-ha-integration"
-version = "1.2.0"
+version = "1.2.1"
 description = "Home Assistant integration for The Lampster RGB Bluetooth lamp"
 requires-python = ">=3.11"
 dependencies = [
