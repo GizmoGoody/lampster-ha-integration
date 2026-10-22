@@ -156,7 +156,7 @@ This project uses semantic versioning (MAJOR.MINOR.PATCH):
 - **MINOR**: New features, non-breaking changes
 - **PATCH**: Bug fixes, documentation updates
 
-### Current Version: 1.1.0
+### Current Version: 1.2.0
 - Phase 1 and Phase 2 complete
 - Fixes setup on current Home Assistant (issue #1)
 - Stays connected while on; touch button changes arrive as notifications
@@ -409,4 +409,4 @@ MIT License (see LICENSE file)
 
 **Last Updated**: 2026-09-27
 **Project Phase**: Phase 2 complete - Home Assistant integration
-**Current Version**: 1.1.0
+**Current Version**: 1.2.0
