@@ -224,6 +224,23 @@ async def test_transition_off_fades_then_powers_off(
     assert coordinator.data.is_on is False
 
 
+async def test_breathe_from_off_uses_last_color(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Breathe started from off breathes the last color, which Home Assistant shows."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_rgb_color", RGBColor(60, 0, 0))
+    await coordinator.async_command("power_off")
+    assert coordinator.data.is_on is False
+
+    await coordinator.async_start_effect("breathe", 255)
+    await asyncio.sleep(1)
+    assert lamp.mode & 0x20  # color mode
+    red, green, blue = lamp.rgb
+    assert red > 0 and green == 0 and blue == 0
+    await coordinator.async_stop_effect()
+
+
 async def test_effect_stopped_by_command(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:

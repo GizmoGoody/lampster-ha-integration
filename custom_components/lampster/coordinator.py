@@ -159,6 +159,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data: LampState | None = None
         self.temperature: float | None = None
         self.effect: str | None = None
+        # The last state The Lampster was on in: while it is off its state has
+        # no mode or color, but Home Assistant still shows these
+        self._last_on: LampState | None = None
 
         # Diagnostics
         self.last_connect_ms: int | None = None
@@ -524,6 +527,8 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Store new state, apply the connection policy and notify entities."""
         was_on = bool(self.data and self.data.is_on)
         self.data = dataclasses.replace(state)
+        if state.is_on:
+            self._last_on = self.data
 
         if self.connected and apply_policy:
             if self._should_stay_connected():
@@ -560,8 +565,11 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     async def async_start_effect(self, effect: str, brightness: int) -> None:
         """Start a software effect at the given brightness (0-255)."""
         await self._async_stop_task()
-        mode = effect_mode(effect, self.data)
-        steps = effect_steps(effect, brightness, self.data)
+        # Started from off, an effect that uses the current color (Breathe)
+        # uses the last one, which Home Assistant still shows
+        start = self.data if self.data and self.data.is_on else self._last_on
+        mode = effect_mode(effect, start)
+        steps = effect_steps(effect, brightness, start)
         self.effect = effect
         self._async_start_task(mode, steps, f"effect {effect}")
         self._record(f"Started effect {effect}")
