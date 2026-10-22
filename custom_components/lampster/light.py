@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .lampster.models import RGBColor, WhiteColor
+from .lampster.models import LampState, RGBColor, WhiteColor
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -25,7 +25,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import COMMAND_ERRORS, LampsterCoordinator
-from .effects import EFFECTS, MODE_RGB, MODE_WHITE
+from .effects import EFFECT_BREATHE, EFFECTS, MODE_RGB, MODE_WHITE
 from .entity import LampsterEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -235,6 +235,26 @@ class LampsterLight(LampsterEntity, LightEntity):
             effect = self.coordinator.effect
 
         try:
+            if (
+                effect is None
+                and self.coordinator.effect == EFFECT_BREATHE
+                and (ATTR_RGB_COLOR in kwargs or ATTR_COLOR_TEMP_KELVIN in kwargs)
+            ):
+                # Color change while Breathe runs: breathe the new color
+                if ATTR_RGB_COLOR in kwargs:
+                    start = LampState(
+                        True, MODE_RGB, _rgb_to_device(kwargs[ATTR_RGB_COLOR], brightness)
+                    )
+                else:
+                    start = LampState(
+                        True,
+                        MODE_WHITE,
+                        None,
+                        _kelvin_to_device(kwargs[ATTR_COLOR_TEMP_KELVIN], brightness),
+                    )
+                await self.coordinator.async_start_effect(EFFECT_BREATHE, brightness, start)
+                return
+
             if effect in EFFECTS:
                 await self.coordinator.async_start_effect(effect, brightness)
                 return

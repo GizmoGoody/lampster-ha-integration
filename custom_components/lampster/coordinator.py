@@ -562,12 +562,19 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     f"The Lampster off for {self._off_disconnect_delay} s"
                 )
 
-    async def async_start_effect(self, effect: str, brightness: int) -> None:
-        """Start a software effect at the given brightness (0-255)."""
+    async def async_start_effect(
+        self, effect: str, brightness: int, start: LampState | None = None
+    ) -> None:
+        """Start a software effect at the given brightness (0-255).
+
+        An effect that uses the current color (Breathe) starts from start
+        when given, for example a color chosen while it runs.
+        """
         await self._async_stop_task()
-        # Started from off, an effect that uses the current color (Breathe)
-        # uses the last one, which Home Assistant still shows
-        start = self.data if self.data and self.data.is_on else self._last_on
+        if start is None:
+            # Started from off, it uses the last color, which Home Assistant
+            # still shows
+            start = self.data if self.data and self.data.is_on else self._last_on
         mode = effect_mode(effect, start)
         steps = effect_steps(effect, brightness, start)
         self.effect = effect
