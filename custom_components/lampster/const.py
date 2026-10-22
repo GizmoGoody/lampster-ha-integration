@@ -25,3 +25,4 @@ DEFAULT_OFF_DISCONNECT_DELAY = 60  # seconds
 
 # Actions
 SERVICE_START_EFFECT = "start_effect"
+SERVICE_STOP_EFFECT = "stop_effect"

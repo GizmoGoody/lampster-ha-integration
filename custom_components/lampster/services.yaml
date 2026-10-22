@@ -9,6 +9,8 @@ start_effect:
       selector:
         state:
           attribute: effect
+          hide_states:
+            - "off"
     speed:
       selector:
         number:
@@ -24,3 +26,12 @@ start_effect:
           max: 100
           unit_of_measurement: "%"
           mode: slider
+    rgb_color:
+      selector:
+        color_rgb:
+
+stop_effect:
+  target:
+    entity:
+      integration: lampster
+      domain: light

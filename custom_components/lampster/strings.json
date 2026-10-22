@@ -97,6 +97,11 @@
       }
     }
   },
+  "exceptions": {
+    "effect_without_color": {
+      "message": "The {effect} effect uses its own colors; Color applies only to Breathe."
+    }
+  },
   "issues": {
     "cannot_connect": {
       "title": "The Lampster cannot be reached",
@@ -110,11 +115,11 @@
   "services": {
     "start_effect": {
       "name": "Start effect",
-      "description": "Starts an effect on The Lampster, optionally at its own speed and brightness. Effects chosen from the light itself run at the Effects speed setting. Off stops the running effect.",
+      "description": "Starts an effect on The Lampster, optionally at its own speed, brightness and color. Effects chosen from the light itself run at the Effects speed setting.",
       "fields": {
         "effect": {
           "name": "Effect",
-          "description": "The effect to start, or Off to stop the running effect."
+          "description": "The effect to start."
         },
         "speed": {
           "name": "Speed",
@@ -123,8 +128,16 @@
         "brightness_pct": {
           "name": "Brightness",
           "description": "Brightness for this run. Leave empty to use the light's current brightness."
+        },
+        "rgb_color": {
+          "name": "Color",
+          "description": "Color for Breathe. Leave empty to breathe the color The Lampster shows now. The other effects use their own colors."
         }
       }
+    },
+    "stop_effect": {
+      "name": "Stop effect",
+      "description": "Stops the running effect on The Lampster. The Lampster stays on in the effect's last color."
     }
   }
 }

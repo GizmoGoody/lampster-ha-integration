@@ -33,6 +33,7 @@ class FakeLamp:
         self.rgb = bytes([0, 0, 30])
         self.client: FakeBleakClient | None = None
         self.white_writes: list[tuple[int, ...]] = []
+        self.rgb_writes: list[tuple[int, ...]] = []
 
     def push(self, key: str, data: bytes) -> None:
         if self.client and self.client.is_connected and key in self.client.subscriptions:
@@ -84,6 +85,7 @@ class FakeBleakClient:
             self.lamp.white_writes.append(tuple(data))
         elif key == RGB:
             self.lamp.rgb = bytes(data)
+            self.lamp.rgb_writes.append(tuple(data))
 
     async def read_gatt_char(self, char: str) -> bytes:
         return {

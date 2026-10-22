@@ -11,6 +11,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
@@ -318,18 +319,48 @@ async def test_effect_speed_restarts_running_effect(
 async def test_start_effect_action(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:
-    """The action starts an effect with its own speed and brightness."""
+    """The action starts an effect with its own speed, brightness and color."""
     coordinator = make_coordinator(always_connected=True)
     light = LampsterLight(coordinator)
     with patch.object(coordinator, "async_start_effect") as start:
         await light.async_start_effect_action("fireplace", speed=150, brightness_pct=40)
-        start.assert_awaited_once_with("fireplace", 102, 150)
+        start.assert_awaited_once_with("fireplace", 102, 150, None)
         start.reset_mock()
         await light.async_start_effect_action("candle")
-        start.assert_awaited_once_with("candle", 255, None)
+        start.assert_awaited_once_with("candle", 255, None, None)
+        start.reset_mock()
+        await light.async_start_effect_action("breathe", rgb_color=(255, 0, 128))
+        start.assert_awaited_once_with("breathe", 255, None, (255, 0, 128))
+        # Only Breathe uses a color
+        with pytest.raises(ServiceValidationError):
+            await light.async_start_effect_action("fireplace", rgb_color=(255, 0, 0))
     with patch.object(coordinator, "async_stop_effect") as stop:
-        await light.async_start_effect_action("off")
+        await light.async_stop_effect_action()
         stop.assert_awaited_once()
+
+
+async def test_breathe_in_a_given_color(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """Breathe started with a color breathes that color, also from white."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_white_color", WhiteColor(40, 10))
+    await coordinator.async_start_effect("breathe", 255, color=(255, 0, 0))
+    assert coordinator.effect_color == (255, 0, 0)
+    await asyncio.sleep(0.5)
+    assert lamp.rgb_writes
+    assert all(green == 0 and blue == 0 for _, green, blue in lamp.rgb_writes)
+    assert max(red for red, _, _ in lamp.rgb_writes) > 0
+
+    # Changing the Effects speed restarts it in the same color
+    await coordinator.async_set_effect_speed(150)
+    assert coordinator.effect_color == (255, 0, 0)
+    await coordinator.async_stop_effect()
+
+    # Effects with their own colors ignore a color
+    await coordinator.async_start_effect("colorloop", 255, color=(255, 0, 0))
+    assert coordinator.effect_color is None
+    await coordinator.async_stop_effect()
 
 
 async def test_repair_issue_raised_and_cleared(

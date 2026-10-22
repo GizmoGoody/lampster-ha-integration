@@ -25,12 +25,14 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .effects import (
     EFFECT_SPEED_DEFAULT,
+    EFFECTS_WITH_COLOR,
     MODE_RGB,
     Color,
     Step,
     current_color,
     effect_mode,
     effect_steps,
+    make_color,
     scale_steps,
     transition_steps,
     zero_color,
@@ -166,6 +168,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The running effect's own speed when an action started it with one;
         # None when it follows effect_speed
         self.effect_speed_override: int | None = None
+        # The running effect's own color (0-255 RGB at full brightness) when
+        # an action started it with one
+        self.effect_color: tuple[int, int, int] | None = None
         self._effect_brightness = 255
 
         # Diagnostics
@@ -566,19 +571,37 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                 )
 
     async def async_start_effect(
-        self, effect: str, brightness: int, speed: int | None = None
+        self,
+        effect: str,
+        brightness: int,
+        speed: int | None = None,
+        color: tuple[int, int, int] | None = None,
     ) -> None:
         """Start a software effect at a brightness (0-255).
 
-        Runs at the given speed (percent), or else at effect_speed.
+        Runs at the given speed (percent), or else at effect_speed. An effect
+        in EFFECTS_WITH_COLOR shows color (0-255 RGB) when one is given, or
+        else the color The Lampster shows now.
         """
         await self._async_stop_task()
-        mode = effect_mode(effect, self.data)
+        if effect not in EFFECTS_WITH_COLOR:
+            color = None
+        start = self.data
+        if color is not None:
+            start = LampState(
+                is_on=True,
+                mode=MODE_RGB,
+                rgb_color=make_color(
+                    MODE_RGB, tuple(c / 255 * brightness / 255 * 100 for c in color)
+                ),
+            )
+        mode = effect_mode(effect, start)
         steps = scale_steps(
-            effect_steps(effect, brightness, self.data), speed or self.effect_speed
+            effect_steps(effect, brightness, start), speed or self.effect_speed
         )
         self.effect = effect
         self.effect_speed_override = speed
+        self.effect_color = color
         self._effect_brightness = brightness
         self._async_start_task(mode, steps, f"effect {effect}")
         self._record(f"Started effect {effect} at {speed or self.effect_speed}% speed")
@@ -588,7 +611,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """Set the speed for effects; a running effect that follows it restarts."""
         self.effect_speed = speed
         if self.effect and self.effect_speed_override is None:
-            await self.async_start_effect(self.effect, self._effect_brightness)
+            await self.async_start_effect(
+                self.effect, self._effect_brightness, color=self.effect_color
+            )
 
     async def async_stop_effect(self) -> None:
         """Stop the running effect, if any (the lamp keeps its last color)."""
