@@ -253,13 +253,15 @@ async def test_color_change_during_breathe(
     with patch.object(coordinator, "async_start_effect") as start:
         await light.async_turn_on(rgb_color=(0, 0, 255), brightness=255)
         start.assert_awaited_once()
-        effect, _, state = start.await_args.args
+        effect = start.await_args.args[0]
+        state = start.await_args.kwargs.get("start", start.await_args.args[-1])
         assert effect == "breathe"
         assert state.mode == "rgb" and state.rgb_color == RGBColor(0, 0, 100)
 
         start.reset_mock()
         await light.async_turn_on(color_temp_kelvin=2700, brightness=255)
-        effect, _, state = start.await_args.args
+        effect = start.await_args.args[0]
+        state = start.await_args.kwargs.get("start", start.await_args.args[-1])
         assert state.mode == "white" and state.white_color.warm == 100
 
         start.reset_mock()
