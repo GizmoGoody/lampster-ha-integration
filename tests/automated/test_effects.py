@@ -55,6 +55,21 @@ def test_effect_steps_are_valid(effect: str) -> None:
         assert all(0 <= value <= 100 for value in color_values(step.color))
 
 
+@pytest.mark.parametrize("effect", [effect for effect in EFFECTS if effect != "fireworks"])
+def test_effects_peak_at_their_brightness(effect: str) -> None:
+    """Each effect (Fireworks keeps its own) peaks at the brightness it runs at.
+
+    A brightness change while an effect runs restarts it at the new
+    brightness, so this is what makes the change show.
+    """
+    state = LampState(True, "rgb", RGBColor(50, 20, 0), WhiteColor(30, 0))
+    for brightness in (255, 128):
+        level = brightness / 255 * 100
+        steps = itertools.islice(effect_steps(effect, brightness, state), 300)
+        peak = max(max(color_values(step.color)) for step in steps if step.color is not None)
+        assert 0.8 * level <= peak <= round(level)
+
+
 def test_breathe_follows_brightness() -> None:
     """Breathe keeps the current color but peaks at the effect's brightness."""
     state = LampState(True, "rgb", RGBColor(40, 20, 0), None)
