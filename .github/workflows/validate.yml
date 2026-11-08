@@ -24,6 +24,26 @@ jobs:
           # issues are repository settings, not code
           ignore: brands topics issues
 
+  ruff:
+    name: Ruff (lint and format)
+    runs-on: ubuntu-latest
+    # Report only until the open branches are merged upstream and the code
+    # is cleaned up in one pass; then remove this line to make it required
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: custom_components tests/automated .github/scripts
+          args: check --output-format=github
+      - name: Check formatting
+        if: success() || failure()
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: custom_components tests/automated .github/scripts
+          args: format --check --diff
+
   tests:
     name: Tests
     runs-on: ubuntu-latest

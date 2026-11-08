@@ -27,3 +27,13 @@ testpaths = ["tests/automated"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+# The workflow lints the integration, its automated tests and the workflow
+# scripts; the Phase 1 hardware scripts and standalone library are left as is
+
+[tool.ruff.lint]
+# Errors, unused code, import order, modern syntax and async mistakes
+select = ["E4", "E7", "E9", "F", "I", "UP", "ASYNC"]
