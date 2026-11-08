@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncGenerator, Callable
 from datetime import timedelta
 from types import SimpleNamespace
@@ -294,6 +295,29 @@ async def test_touch_hold_during_effect_stays_on(
     assert lamp.mode & 0x80
     assert coordinator.effect is None
     assert coordinator.data.mode == "white"
+
+
+async def test_step_time_includes_the_write(
+    hass: HomeAssistant,
+    lamp: FakeLamp,
+    make_coordinator: CoordinatorFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A step's write time counts toward its delay, so slow writes keep the pace.
+
+    Two steps of 0.5 s and 0.2 s with writes of 0.3 s take about 0.8 s, not 1.3 s.
+    """
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_rgb_color", RGBColor(10, 0, 0))
+
+    async def slow_write(color: RGBColor) -> None:
+        await asyncio.sleep(0.3)
+
+    monkeypatch.setattr(coordinator._client, "set_rgb_color", slow_write)
+    steps = [effects.Step(RGBColor(1, 0, 0), 0.5), effects.Step(RGBColor(2, 0, 0), 0.2)]
+    start = time.monotonic()
+    await coordinator._async_run_steps("rgb", iter(steps), "test", None)
+    assert time.monotonic() - start < 1.1
 
 
 async def test_repair_issue_raised_and_cleared(
