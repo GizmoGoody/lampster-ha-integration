@@ -231,9 +231,13 @@ class LampsterClient:
             raise CommandError(f"Failed to power on: {e}") from e
 
     async def power_off(self):
-        """Turn the lamp off.
+        """Turn the lamp off the way its touch button does.
 
-        Sets colors to zero and switches to white mode before powering off.
+        The touch button clears the power bit and keeps the mode (0x48 from
+        white, 0x28 from color), so the next tap brings back the same mode
+        and levels. If the lamp does not accept that, fall back to switching
+        to white, zeroing the levels and powering off, which always works
+        but leaves the levels at zero for the next tap.
 
         Raises:
             ConnectionError: If not connected
@@ -242,6 +246,26 @@ class LampsterClient:
         if not self._client or not self._client.is_connected:
             raise ConnectionError("Not connected to device")
 
+        try:
+            mode = await self._read_mode()
+            if mode & MODE_BIT_POWER:
+                try:
+                    await self._write_mode(mode & ~MODE_BIT_POWER)
+                    turned_off = not await self._read_mode() & MODE_BIT_POWER
+                except CommandError as e:
+                    _LOGGER.debug(f"Power off keeping the mode failed: {e}")
+                    turned_off = False
+                if not turned_off:
+                    await self._power_off_zeroed()
+            self._state.is_on = False
+            self._state.mode = "off"
+            _LOGGER.info("Lamp powered off")
+        except Exception as e:
+            raise CommandError(f"Failed to power off: {e}") from e
+
+    async def _power_off_zeroed(self):
+        """Power off by switching to white and zeroing the levels first."""
+        _LOGGER.debug("Powering off with zeroed levels")
         try:
             # Switch to white mode first (required for power off to work from RGB mode)
             await self._write_mode(MODE_WHITE)
@@ -255,10 +279,10 @@ class LampsterClient:
 
             # Now send power off
             await self._write_mode(MODE_POWER_OFF)
-
-            self._state.is_on = False
-            self._state.mode = "off"
-            _LOGGER.info("Lamp powered off")
+            self._state.white_color = WhiteColor(0, 0)
+            self._state.rgb_color = RGBColor(0, 0, 0)
+        except CommandError:
+            raise
         except Exception as e:
             raise CommandError(f"Failed to power off: {e}") from e
 
