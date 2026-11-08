@@ -27,6 +27,9 @@ MODE_POWER_OFF = 0x40
 MODE_RGB = 0xA8
 MODE_WHITE = 0xC8
 MODE_OFF = 0x28
+# Off, keeping the mode, as the touch button turns it off
+MODE_RGB_OFF = 0x28
+MODE_WHITE_OFF = 0x48
 
 # Bits observed in the MODE value read back from the device (e.g. 0x48 is
 # white mode while off, 0x28 is RGB mode while off)

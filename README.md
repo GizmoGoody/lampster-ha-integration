@@ -8,7 +8,7 @@ Home Assistant custom integration for The Lampster, an RGB Bluetooth lamp (Model
 - ✅ **RGB Color Control** - Full RGB color picker support
 - ✅ **Color Temperature** - Warm to cool white (2700K - 6500K)
 - ✅ **Favorite Colors** - Red, green, blue, white, cyan, magenta, yellow and ten common white temperatures added to the color picker (appended to your own favorites; each is added only once, so removed ones stay removed)
-- ✅ **Effects** - Color Loop, Random, Candle, Fireplace, Breathe and Spin, from the light card
+- ✅ **Effects** - Color Loop, Random, Candle, Fireplace, Breathe, Spin, Fireworks and Pursuit, from the light card
 - ✅ **Transitions** - Fade on, off or between colors over any number of seconds
 - ✅ **Diagnostics and repairs** - Downloadable diagnostics, and a repair notice when The Lampster cannot be reached
 - ✅ **Brightness Control** - Adjust light intensity
@@ -116,6 +116,8 @@ Effects are chosen from the light card or with `light.turn_on`:
 | Fireplace | Red and orange embers that flare and fade |
 | Spin CW, Spin CCW | The ring of LEDs appears to turn clockwise or counterclockwise. Each LED has its red, blue and green parts side by side, so lighting them one after another moves the light around the ring; the color changes as it turns |
 | Spin Alternating | Spins one way, then the other, changing direction every 4 seconds |
+| Fireworks | The Lampster turns off; after 1 to 5 seconds a dim orange trail appears and slowly brightens from 5% to 20% over 3 to 5 seconds, then the shell bursts in red, orange, gold, green, blue, purple or white (50%, then at once 80 to 100%) and fades back to off over 1 to 3 seconds. Then the next shell. Ignores the light's brightness; follows the Effects speed |
+| Pursuit | Red and blue in turn, like police lights, each fading in and out over half a second. Slower than real police lights on purpose, so it stays under three flashes a second |
 
 The Lampster has no built-in effects or fades, so Home Assistant sends each step over the Bluetooth connection. Any other command, turning it off, or tapping or holding the touch button stops an effect or fade, whether it runs in white or in color. In color mode, The Lampster's touch button switches to white instead of turning off, so a tap during a color effect or fade turns The Lampster off; holding the button instead stops the effect and dims in white.
 

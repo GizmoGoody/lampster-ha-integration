@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import random
 
 import pytest
 
@@ -52,7 +53,68 @@ def test_effect_steps_are_valid(effect: str) -> None:
     state = LampState(True, "rgb", RGBColor(50, 20, 0), WhiteColor(30, 0))
     for step in itertools.islice(effect_steps(effect, 200, state), 200):
         assert step.delay > 0
-        assert all(0 <= value <= 100 for value in color_values(step.color))
+        if step.color is not None:  # None: off for the step
+            assert all(0 <= value <= 100 for value in color_values(step.color))
+
+
+def test_fireworks_shells() -> None:
+    """Each shell: off 1-5 s, an orange trail ramping from 5% to 20% over 3-5 s,
+    a burst at 50% then 80-100% in a firework color, then a fade to off.
+    The light's brightness is ignored, and no step is all zero."""
+    random.seed(1)
+    steps = list(itertools.islice(effect_steps("fireworks", 3, None), 4000))
+    assert steps[0].color is None  # starts off
+    shells = 0
+    i = 0
+    while i < len(steps) - 80:
+        off = steps[i]
+        assert off.color is None and 1.0 <= off.delay <= 5.0
+        i += 1
+        # Trail: orange from 5% up to 20%, one channel by 1% at a time, with
+        # longer steps while dim
+        trail = []
+        while max(color_values(steps[i].color)) <= 20:
+            red, green, blue = color_values(steps[i].color)
+            assert red >= 5 and green >= 2 and blue == 0
+            if trail:
+                before = color_values(trail[-1].color)
+                assert sum(abs(a - b) for a, b in zip(before, (red, green, blue))) == 1
+            trail.append(steps[i])
+            i += 1
+        assert color_values(trail[0].color) == (5, 2, 0)
+        assert trail[0].delay > trail[-1].delay
+        assert 3.0 - 1e-9 <= sum(s.delay for s in trail) <= 5.0 + 1e-9
+        assert color_values(trail[-1].color) == (20, 8, 0)
+        # Burst: 50%, then the peak, in a firework color
+        start, peak = color_values(steps[i].color), color_values(steps[i + 1].color)
+        assert max(start) == 50 and 80 <= max(peak) <= 100
+        assert any(
+            all(abs(v - c * max(peak) / 100) <= 1 for v, c in zip(peak, color))
+            for color in effects.FIREWORKS_COLORS
+        )
+        i += 2
+        # Fade: down to off over 1-3 s (including the peak step)
+        fade = [steps[i - 1]]
+        while steps[i].color is not None:
+            assert max(color_values(steps[i].color)) <= max(color_values(fade[-1].color))
+            fade.append(steps[i])
+            i += 1
+        assert 0.8 - 1e-9 <= sum(s.delay for s in fade) <= 3.0 + 1e-9
+        shells += 1
+    assert shells > 30
+    assert all(s.color is None or any(color_values(s.color)) for s in steps)
+
+
+def test_pursuit_alternates_slowly() -> None:
+    """Pursuit alternates red and blue, changing color twice a second."""
+    steps = list(itertools.islice(effect_steps("pursuit", 255, None), 12))
+    # Starts straight on full red, then fades out
+    assert color_values(steps[0].color) == (100, 0, 0)
+    assert sum(step.delay for step in steps[:2]) == pytest.approx(0.4)
+    # Then each color takes half a second: blue, red, ...
+    assert sum(step.delay for step in steps[2:5]) == pytest.approx(0.5)
+    assert {color_values(step.color)[2] > 0 for step in steps[2:5]} == {True}
+    assert {color_values(step.color)[0] > 0 for step in steps[5:8]} == {True}
 
 
 def _spin_colors(effect: str, count: int) -> list[RGBColor]:

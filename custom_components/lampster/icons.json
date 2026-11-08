@@ -19,7 +19,9 @@
               "breathe": "mdi:sine-wave",
               "spin_cw": "mdi:rotate-right",
               "spin_ccw": "mdi:rotate-left",
-              "spin_alternating": "mdi:arrow-oscillating"
+              "spin_alternating": "mdi:arrow-oscillating",
+              "fireworks": "mdi:firework",
+              "pursuit": "mdi:car-emergency"
             }
           }
         }

@@ -174,6 +174,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # and the white levels it last reported or were last read
         self._white_steps = 0
         self._reported_white: WhiteColor | None = None
+        # The task turned The Lampster off for a step (for example between
+        # fireworks); turning it on now is the touch button
+        self._task_off = False
         self._versions_read = False
         self._consecutive_failures = 0
         self._last_error: str | None = None
@@ -574,6 +577,21 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     def _handle_state_notification(self, state: LampState) -> None:
         """Handle a change pushed by the lamp (touch button or our own writes)."""
         _LOGGER.debug("The Lampster reported: %s", state)
+        if self._task_mode is not None and self._task_off:
+            if not state.is_on:
+                # The task's own off
+                return
+            # The task had turned The Lampster off, so the touch button
+            # turned it on: stop the task and keep it on
+            self._async_record_touch(state)
+            self._record(
+                "The Lampster was turned on with the touch button; stopping "
+                + (f"effect {self.effect}" if self.effect else "transition")
+            )
+            self._task_mode = None
+            self.hass.async_create_task(self._async_stop_task())
+            self._async_set_state(state, batch=True)
+            return
         self._async_record_touch(state)
         if self._task_mode is not None and self._task_engaged:
             # The effect's or transition's writes are not reported
@@ -816,6 +834,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._task_mode = mode
         self._task_engaged = False
         self._task_color = None
+        self._task_off = False
         self._task = self.hass.async_create_background_task(
             self._async_run_steps(mode, steps, name, finish), f"lampster {name}"
         )
@@ -833,7 +852,11 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             await task
         except asyncio.CancelledError:
             pass
-        if was_effect:
+        if self._task_off and self._client is not None:
+            # Stopped while the task had The Lampster off: show it as off
+            self._task_off = False
+            self._async_set_state(self._client.state, batch=False)
+        elif was_effect:
             self.async_update_listeners()
 
     async def _async_run_steps(
@@ -856,13 +879,24 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     client = await self._async_ensure_connected(name)
                     if self._task_mode != mode or (
                         self._task_engaged
+                        and not self._task_off
                         and not (client.state.is_on and client.state.mode == mode)
                     ):
                         # Stopped by the touch button (off, another mode or a
                         # hold); writing now would undo it
                         return
-                    await getattr(client, write)(step.color)
-                    self._task_color = step.color
+                    if step.color is None:
+                        # Off for this step (all channels at zero would glow).
+                        # Set first, so a report of this off is not taken for
+                        # the touch button
+                        self._task_off = True
+                        if client.state.is_on:
+                            await client.switch_off()
+                    else:
+                        # Before the write: turning back on is not the button
+                        self._task_off = False
+                        await getattr(client, write)(step.color)
+                        self._task_color = step.color
                     # The Lampster is now in the task's mode. It only reports
                     # mode changes, not our color writes, so this cannot be
                     # left to its reports (none come when it was already in

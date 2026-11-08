@@ -22,6 +22,8 @@ EFFECT_BREATHE = "breathe"
 EFFECT_SPIN_CW = "spin_cw"
 EFFECT_SPIN_CCW = "spin_ccw"
 EFFECT_SPIN_ALTERNATING = "spin_alternating"
+EFFECT_FIREWORKS = "fireworks"
+EFFECT_PURSUIT = "pursuit"
 EFFECTS = (
     EFFECT_BREATHE,
     EFFECT_COLORLOOP,
@@ -31,6 +33,8 @@ EFFECTS = (
     EFFECT_SPIN_CW,
     EFFECT_SPIN_CCW,
     EFFECT_SPIN_ALTERNATING,
+    EFFECT_FIREWORKS,
+    EFFECT_PURSUIT,
 )
 
 MODE_RGB = "rgb"
@@ -53,6 +57,37 @@ SPIN_CCW_ORDER = ((1, 0, 0), (0, 0, 1), (0, 1, 0))
 SPIN_STEP = 0.15
 # Spin Alternating: change direction after this many seconds
 SPIN_ALTERNATE_AFTER = 4.0
+# Fireworks: the lamp is off; after 1-5 s an orange trail appears at 5% and
+# ramps up to 20% over 3-5 s; the shell then bursts in a firework color (50%, then at
+# once its peak of 80-100%) and fades back to off over 1-3 s. Then the next
+# shell. It ignores the light's brightness. Bursts are at least 4 s apart (2 s
+# at 200% Effects speed), well under three flashes in a second.
+FIREWORKS_COLORS = (
+    (100, 0, 0),  # red
+    (100, 35, 0),  # orange
+    (100, 70, 5),  # gold
+    (0, 100, 10),  # green
+    (0, 25, 100),  # blue
+    (60, 0, 100),  # purple
+    (100, 100, 100),  # white
+)
+FIREWORKS_TRAIL = (100, 40, 0)  # orange
+FIREWORKS_STEP = 0.1
+FIREWORKS_OFF = (1.0, 5.0)  # seconds off before each shell
+FIREWORKS_TRAIL_TIME = (3.0, 5.0)  # seconds the trail ramps up
+# Percent the trail starts and ends at. Each channel has 1% steps, so below
+# about 5% orange rounds to red (1% orange is red 1, green 0)
+FIREWORKS_TRAIL_LEVEL = (5, 20)
+FIREWORKS_BURST_START = 50  # percent the burst starts at
+FIREWORKS_PEAK = (80, 100)  # percent the burst peaks at
+FIREWORKS_FADE = (1.0, 3.0)  # seconds the burst fades to off
+# Shortest time any trail step is shown (a Bluetooth write every ~0.1 s)
+FIREWORKS_TRAIL_MIN_STEP = 0.1
+# Pursuit: red and blue like police lights, but slow enough to be safe: each
+# color fades in, holds and fades out over half a second, so the color changes
+# twice a second (under the usual limit of three flashes in a second)
+PURSUIT_COLORS = ((100, 0, 0), (0, 0, 100))
+PURSUIT_STEPS = ((0.5, 0.1), (1.0, 0.3), (0.5, 0.1))  # (level, seconds)
 # Shortest time between transition steps
 TRANSITION_MIN_STEP = 0.25
 
@@ -61,9 +96,13 @@ Color = RGBColor | WhiteColor
 
 @dataclass(frozen=True)
 class Step:
-    """One color to show, and for how long."""
+    """One color to show, and for how long.
 
-    color: Color
+    A color of None turns The Lampster off for the step: in color mode, all
+    channels at zero still leave a dim green glow.
+    """
+
+    color: Color | None
     delay: float
 
 
@@ -138,6 +177,17 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
                 RGBColor(_pct(flame), _pct(flame * random.uniform(0.12, 0.4)), 0),
                 random.uniform(0.1, 0.35),
             )
+    elif effect == EFFECT_FIREWORKS:
+        yield from _fireworks()
+    elif effect == EFFECT_PURSUIT:
+        first = True
+        while True:
+            for color in PURSUIT_COLORS:
+                for factor, delay in PURSUIT_STEPS:
+                    if first and factor < 1:
+                        continue  # start straight on full red, without a fade-in
+                    first = False
+                    yield Step(RGBColor(*(_pct(c / 100 * level * factor) for c in color)), delay)
     elif effect == EFFECT_BREATHE:
         mode = effect_mode(effect, state)
         peak = color_values(current_color(state, mode))
@@ -167,6 +217,57 @@ def effect_steps(effect: str, brightness: int, state: LampState | None) -> Itera
                 clockwise = not clockwise
     else:
         raise ValueError(f"Unknown effect: {effect}")
+
+
+def _fireworks_trail(duration: float) -> Iterator[Step]:
+    """The orange trail, as smooth as The Lampster's 1% steps allow.
+
+    Each step changes one channel by 1% (whichever keeps the color closest to
+    orange), and the steps are spaced evenly in perceived brightness: the eye
+    sees relative changes, so the dim start gets longer gaps than the end.
+    """
+    low, high = FIREWORKS_TRAIL_LEVEL
+    ratio = FIREWORKS_TRAIL[1] / FIREWORKS_TRAIL[0]
+    red, green = low, round(low * ratio)
+    end_green = round(high * ratio)
+    colors = [(red, green)]
+    while (red, green) != (high, end_green):
+        if green < end_green and (red == high or (green + 1) / red <= ratio):
+            green += 1
+        else:
+            red += 1
+        colors.append((red, green))
+    # Time each color in proportion to how dim it is (its share of 1/red)
+    weights = [1 / r for r, _ in colors]
+    scale = duration / sum(weights)
+    for (r, g), weight in zip(colors, weights):
+        yield Step(RGBColor(r, g, 0), max(FIREWORKS_TRAIL_MIN_STEP, weight * scale))
+
+
+def _fireworks() -> Iterator[Step]:
+    """Shells that climb as an orange trail, burst in a color and fade to off."""
+
+    def shown(color: tuple[int, ...], percent: float) -> RGBColor | None:
+        rgb = RGBColor(*(_pct(c / 100 * percent) for c in color))
+        # Too dim to show anything: off, since all zero glows dim green
+        return rgb if any(rgb.to_bytes()) else None
+
+    while True:
+        yield Step(None, random.uniform(*FIREWORKS_OFF))
+        # Trail: orange ramping up from dim to FIREWORKS_TRAIL_LEVEL
+        yield from _fireworks_trail(random.uniform(*FIREWORKS_TRAIL_TIME))
+        # Burst: bright at once, then brighter still
+        color = random.choice(FIREWORKS_COLORS)
+        peak = random.uniform(*FIREWORKS_PEAK)
+        yield Step(shown(color, FIREWORKS_BURST_START), FIREWORKS_STEP)
+        yield Step(shown(color, peak), FIREWORKS_STEP)
+        # Fade: the same color from its peak down to off
+        fade = max(2, round(random.uniform(*FIREWORKS_FADE) / FIREWORKS_STEP))
+        for i in range(1, fade):
+            step = shown(color, peak * (1 - i / fade) ** 1.5)
+            if step is None:
+                break  # faded out: the off step that follows takes over
+            yield Step(step, FIREWORKS_STEP)
 
 
 def _hue_color(hue: float, level: float) -> RGBColor:
