@@ -69,6 +69,11 @@
           }
         }
       }
+    },
+    "number": {
+      "effects_speed": {
+        "name": "Effects speed"
+      }
     }
   },
   "options": {
@@ -113,6 +118,26 @@
       "options": {
         "periodic": "Periodic – Stays connected while The Lampster is on, and disconnects a while after it is turned off. Select Submit to set the timing.",
         "constant": "Constant – Stays connected at all times, so commands respond faster and touch-button changes show up instantly. This permanently uses one connection slot on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default)."
+      }
+    }
+  },
+  "services": {
+    "start_effect": {
+      "name": "Start effect",
+      "description": "Starts an effect on The Lampster, optionally at its own speed and brightness. Effects chosen from the light itself run at the Effects speed setting. Off stops the running effect.",
+      "fields": {
+        "effect": {
+          "name": "Effect",
+          "description": "The effect to start, or Off to stop the running effect."
+        },
+        "speed": {
+          "name": "Speed",
+          "description": "Speed for this run, in percent of normal. Leave empty to use the Effects speed setting."
+        },
+        "brightness_pct": {
+          "name": "Brightness",
+          "description": "Brightness for this run. Leave empty to use the light's current brightness."
+        }
       }
     }
   }

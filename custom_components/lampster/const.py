@@ -39,3 +39,7 @@ def get_connection_mode(options: Mapping[str, Any]) -> str:
     if mode in CONNECTION_MODES:
         return mode
     return CONNECTION_PERIODIC
+
+
+# Actions
+SERVICE_START_EFFECT = "start_effect"
