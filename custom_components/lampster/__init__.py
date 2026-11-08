@@ -2,6 +2,7 @@
 
 Protocol based on: https://github.com/Noki/the-lampster
 """
+
 from __future__ import annotations
 
 import logging
@@ -51,12 +52,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         address,
         always_connected=get_connection_mode(options) == CONNECTION_CONSTANT,
-        poll_interval=int(
-            options.get(CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL)
-        ),
-        off_disconnect_delay=int(
-            options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER)
-        ),
+        poll_interval=int(options.get(CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL)),
+        off_disconnect_delay=int(options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER)),
     )
 
     # Store coordinator for the platforms

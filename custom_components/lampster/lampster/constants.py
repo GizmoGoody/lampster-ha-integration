@@ -9,9 +9,9 @@ All characteristic UUIDs and command values are based on Noki's reverse engineer
 # Based on handles from Noki's documentation:
 #   0x0021 (mode), 0x0025 (white), 0x002a (RGB)
 SERVICE_UUID = "01ff5553-ba5e-f4ee-5ca1-eb1e5e4b1ce0"
-CHAR_MODE = "01ff5554-ba5e-f4ee-5ca1-eb1e5e4b1ce0"    # Handle 0x0020 (≈ 0x0021)
+CHAR_MODE = "01ff5554-ba5e-f4ee-5ca1-eb1e5e4b1ce0"  # Handle 0x0020 (≈ 0x0021)
 CHAR_WHITE = "01ff5556-ba5e-f4ee-5ca1-eb1e5e4b1ce0"  # Handle 0x0024 (≈ 0x0025)
-CHAR_RGB = "01ff5559-ba5e-f4ee-5ca1-eb1e5e4b1ce0"    # Handle 0x0029 (≈ 0x002a)
+CHAR_RGB = "01ff5559-ba5e-f4ee-5ca1-eb1e5e4b1ce0"  # Handle 0x0029 (≈ 0x002a)
 
 # Standard Bluetooth Temperature characteristic (sint16, 0.01 °C). The device
 # notifies it about every 5 seconds while connected; appears to be internal.

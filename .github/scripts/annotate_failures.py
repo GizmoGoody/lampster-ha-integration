@@ -1,4 +1,5 @@
 """Print pytest failures from a JUnit XML file as GitHub error annotations."""
+
 import sys
 import xml.etree.ElementTree as ET
 

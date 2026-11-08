@@ -4,6 +4,7 @@ Combines the integration's own requirements with those of the Home Assistant
 components it depends on, taken from the installed Home Assistant version so
 the versions always match.
 """
+
 import json
 from pathlib import Path
 

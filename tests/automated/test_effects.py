@@ -1,4 +1,5 @@
 """Tests for effects, transitions and color conversions."""
+
 from __future__ import annotations
 
 import itertools
@@ -6,22 +7,22 @@ import random
 
 import pytest
 
+from custom_components.lampster import effects
 from custom_components.lampster.effects import (
     EFFECT_BREATHE,
     EFFECT_CANDLE,
     EFFECTS,
     MODE_RGB,
     MODE_WHITE,
+    Step,
     color_values,
     current_color,
     effect_mode,
-    Step,
     effect_steps,
     scale_steps,
     transition_steps,
     zero_color,
 )
-from custom_components.lampster import effects
 from custom_components.lampster.lampster.models import LampState, RGBColor, WhiteColor
 from custom_components.lampster.light import (
     _device_to_kelvin,
@@ -146,7 +147,11 @@ def test_spin_alternating_changes_direction() -> None:
 
 def test_scale_steps_speed() -> None:
     """Effects speed scales step times, never shorter than 0.1 s when sped up."""
-    steps = [Step(RGBColor(1, 0, 0), 1.0), Step(RGBColor(2, 0, 0), 0.15), Step(RGBColor(3, 0, 0), 0.08)]
+    steps = [
+        Step(RGBColor(1, 0, 0), 1.0),
+        Step(RGBColor(2, 0, 0), 0.15),
+        Step(RGBColor(3, 0, 0), 0.08),
+    ]
     assert [s.delay for s in scale_steps(iter(steps), 100)] == [1.0, 0.15, 0.08]
     assert [s.delay for s in scale_steps(iter(steps), 200)] == [0.5, 0.1, 0.08]
     assert [s.delay for s in scale_steps(iter(steps), 25)] == [4.0, 0.6, 0.32]

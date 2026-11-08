@@ -29,7 +29,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py311"
 line-length = 100
 # The workflow lints the integration, its automated tests and the workflow
 # scripts; the Phase 1 hardware scripts and standalone library are left as is

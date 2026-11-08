@@ -4,13 +4,13 @@ Based on protocol documentation from: https://github.com/Noki/the-lampster
 """
 
 from .client import LampsterClient
-from .models import RGBColor, WhiteColor, LampState
 from .exceptions import (
-    LampsterException,
-    ConnectionError,
     CommandError,
+    ConnectionError,
     DiscoveryError,
+    LampsterException,
 )
+from .models import LampState, RGBColor, WhiteColor
 
 __version__ = "1.1.0"
 

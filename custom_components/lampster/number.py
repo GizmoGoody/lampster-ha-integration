@@ -1,4 +1,5 @@
 """Effects speed setting for The Lampster integration."""
+
 from __future__ import annotations
 
 from homeassistant.components.number import NumberMode, RestoreNumber

@@ -1,13 +1,11 @@
 """Light platform for The Lampster integration."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
 import voluptuous as vol
-
-from .lampster.models import LampState, RGBColor, WhiteColor
-
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
@@ -41,6 +39,7 @@ from .effects import (
     MODE_WHITE,
 )
 from .entity import LampsterEntity
+from .lampster.models import LampState, RGBColor, WhiteColor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,18 +129,14 @@ async def async_setup_entry(
             vol.Optional("speed"): vol.All(
                 vol.Coerce(int), vol.Range(min=EFFECT_SPEED_MIN, max=EFFECT_SPEED_MAX)
             ),
-            vol.Optional("brightness_pct"): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=100)
-            ),
+            vol.Optional("brightness_pct"): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
             vol.Optional("rgb_color"): vol.All(
                 vol.Coerce(tuple), vol.ExactSequence((cv.byte, cv.byte, cv.byte))
             ),
         },
         "async_start_effect_action",
     )
-    platform.async_register_entity_service(
-        SERVICE_STOP_EFFECT, None, "async_stop_effect_action"
-    )
+    platform.async_register_entity_service(SERVICE_STOP_EFFECT, None, "async_stop_effect_action")
 
 
 class LampsterLight(LampsterEntity, LightEntity):
@@ -382,9 +377,7 @@ class LampsterLight(LampsterEntity, LightEntity):
             else self._attr_brightness or 255
         )
         try:
-            await self.coordinator.async_start_effect(
-                effect, brightness, speed, rgb_color
-            )
+            await self.coordinator.async_start_effect(effect, brightness, speed, rgb_color)
         except COMMAND_ERRORS as err:
             raise HomeAssistantError(f"Failed to start the effect: {err}") from err
 

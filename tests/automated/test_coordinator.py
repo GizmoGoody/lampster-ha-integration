@@ -1,4 +1,5 @@
 """Tests for the connection policy, effects, transitions and repairs."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,12 +10,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.lampster import coordinator as coordinator_module
 from custom_components.lampster import effects
@@ -534,9 +534,7 @@ async def test_diagnostics_hold_during_effect_is_a_hold(
             break
         await asyncio.sleep(0.05)
     lamp.touch_hold(steps=2)
-    assert not any(
-        event.startswith("Touch button: State(on") for event in event_log(coordinator)
-    )
+    assert not any(event.startswith("Touch button: State(on") for event in event_log(coordinator))
 
 
 async def test_not_heard_repair_issue(

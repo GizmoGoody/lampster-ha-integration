@@ -1,4 +1,5 @@
 """Device registry helpers that work across Home Assistant versions."""
+
 from __future__ import annotations
 
 from homeassistant.helpers import device_registry as dr

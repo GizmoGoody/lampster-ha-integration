@@ -1,24 +1,25 @@
 """Coordinator for The Lampster integration."""
+
 from __future__ import annotations
 
 import asyncio
-from collections import deque
-from collections.abc import Awaitable, Callable, Iterable
 import dataclasses
-from datetime import datetime, timedelta
 import logging
 import time
+from collections import deque
+from collections.abc import Awaitable, Callable, Iterable
+from datetime import datetime, timedelta
 from typing import Any
 
 from bleak.exc import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
-
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth.passive_update_coordinator import (
     PassiveBluetoothDataUpdateCoordinator,
 )
 from homeassistant.core import CALLBACK_TYPE, CoreState, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
@@ -42,6 +43,8 @@ from .lampster.client import LampsterClient
 from .lampster.constants import CHAR_MODE
 from .lampster.exceptions import (
     ConnectionError as LampsterConnectionError,
+)
+from .lampster.exceptions import (
     LampsterException,
 )
 from .lampster.models import LampState, WhiteColor
@@ -257,9 +260,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
     @property
     def last_service_info(self) -> bluetooth.BluetoothServiceInfoBleak | None:
         """Return the most recent advertisement seen for the lamp."""
-        return bluetooth.async_last_service_info(
-            self.hass, self._address, connectable=True
-        )
+        return bluetooth.async_last_service_info(self.hass, self._address, connectable=True)
 
     @property
     def connection_source(self) -> str | None:
@@ -356,7 +357,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         now = time.monotonic()
         if self._not_heard_since is None:
             self._not_heard_since = now
-            self._record("The Lampster is not connected and not heard by any Bluetooth adapter or proxy")
+            self._record(
+                "The Lampster is not connected and not heard by any Bluetooth adapter or proxy"
+            )
         elif now - self._not_heard_since >= NOT_HEARD_ISSUE_AFTER:
             ir.async_create_issue(
                 self.hass,
@@ -454,9 +457,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
 
             self._async_set_state(client.state, batch=False)
 
-    async def _async_execute(
-        self, method_name: str, args: tuple[Any, ...]
-    ) -> LampsterClient:
+    async def _async_execute(self, method_name: str, args: tuple[Any, ...]) -> LampsterClient:
         """Run a client method, connecting first if needed. Lock must be held."""
         client = await self._async_ensure_connected(f"command {method_name}")
         start = time.monotonic()
@@ -519,8 +520,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
 
         self._client = client
         self._record(
-            f"Connected in {self.last_connect_ms} ms ({reason}), "
-            f"The Lampster state: {client.state}"
+            f"Connected in {self.last_connect_ms} ms ({reason}), The Lampster state: {client.state}"
         )
         self._async_connection_succeeded()
         self._async_cancel_source_refresh()
@@ -541,9 +541,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         versions = await client.read_versions()
         self._versions_read = True
         registry = dr.async_get(self.hass)
-        if versions and (
-            device := find_device(registry, identifiers={(DOMAIN, self._address)})
-        ):
+        if versions and (device := find_device(registry, identifiers={(DOMAIN, self._address)})):
             registry.async_update_device(
                 device.id,
                 sw_version=versions.get("firmware"),
@@ -573,9 +571,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._async_cancel_off_disconnect()
 
         if not self._stopping and self._should_stay_connected():
-            self._record(
-                f"Connection dropped unexpectedly; reconnecting in {RECONNECT_DELAY} s"
-            )
+            self._record(f"Connection dropped unexpectedly; reconnecting in {RECONNECT_DELAY} s")
             self._async_cancel_reconnect()
             self._cancel_reconnect = async_call_later(
                 self.hass, RECONNECT_DELAY, self._async_reconnect
@@ -720,12 +716,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         """
         await asyncio.sleep(TOUCH_OFF_DELAY)
         state = self.data
-        if (
-            state
-            and state.is_on
-            and state.mode == "white"
-            and self._white_steps == white_steps
-        ):
+        if state and state.is_on and state.mode == "white" and self._white_steps == white_steps:
             self._record("Touch button tapped during a color effect or fade; turning off")
             try:
                 await self.async_command("power_off")
@@ -741,9 +732,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             self._async_schedule_batched_update()
 
     @callback
-    def _async_set_state(
-        self, state: LampState, *, batch: bool, apply_policy: bool = True
-    ) -> None:
+    def _async_set_state(self, state: LampState, *, batch: bool, apply_policy: bool = True) -> None:
         """Store new state, apply the connection policy and notify entities."""
         was_on = bool(self.data and self.data.is_on)
         self.data = dataclasses.replace(state)
@@ -779,9 +768,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             # It may have been turned back on, or a command may have
             # rescheduled this while waiting for the lock
             if self._cancel_off_disconnect is None and not self._should_stay_connected():
-                await self._async_disconnect(
-                    f"The Lampster off for {self._off_disconnect_delay} s"
-                )
+                await self._async_disconnect(f"The Lampster off for {self._off_disconnect_delay} s")
 
     async def async_start_effect(
         self,
@@ -814,9 +801,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             # still shows
             start = self.data if self.data and self.data.is_on else self._last_on
         mode = effect_mode(effect, start)
-        steps = scale_steps(
-            effect_steps(effect, brightness, start), speed or self.effect_speed
-        )
+        steps = scale_steps(effect_steps(effect, brightness, start), speed or self.effect_speed)
         self.effect = effect
         self.effect_speed_override = speed
         self.effect_color = color
@@ -1050,9 +1035,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             }
             if service_info
             else None,
-            "recent_events": [
-                {"time": time_, "event": event} for time_, event in self._events
-            ],
+            "recent_events": [{"time": time_, "event": event} for time_, event in self._events],
         }
 
     @callback

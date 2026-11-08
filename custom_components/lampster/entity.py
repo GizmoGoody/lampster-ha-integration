@@ -1,4 +1,5 @@
 """Base entity for The Lampster integration."""
+
 from __future__ import annotations
 
 from homeassistant.components.bluetooth.passive_update_coordinator import (

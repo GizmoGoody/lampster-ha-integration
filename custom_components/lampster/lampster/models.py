@@ -1,7 +1,6 @@
 """Data models for The Lampster."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -63,8 +62,8 @@ class LampState:
 
     is_on: bool
     mode: str  # 'rgb', 'white', or 'off'
-    rgb_color: Optional[RGBColor] = None
-    white_color: Optional[WhiteColor] = None
+    rgb_color: RGBColor | None = None
+    white_color: WhiteColor | None = None
 
     def __str__(self) -> str:
         if not self.is_on:

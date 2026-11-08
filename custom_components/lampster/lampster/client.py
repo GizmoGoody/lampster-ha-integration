@@ -4,10 +4,9 @@ Protocol based on: https://github.com/Noki/the-lampster
 """
 
 import asyncio
-from collections.abc import Callable
 import dataclasses
 import logging
-from typing import Optional
+from collections.abc import Callable
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
@@ -21,15 +20,15 @@ from .constants import (
     CHAR_WHITE,
     DEVICE_NAME_PREFIX,
     MODE_BIT_POWER,
-    MODE_RGB_OFF,
-    MODE_WHITE_OFF,
     MODE_BIT_RGB,
-    MODE_WRITE_ATTEMPTS,
-    MODE_WRITE_RETRY_DELAY,
     MODE_POWER_OFF,
     MODE_POWER_ON,
     MODE_RGB,
+    MODE_RGB_OFF,
     MODE_WHITE,
+    MODE_WHITE_OFF,
+    MODE_WRITE_ATTEMPTS,
+    MODE_WRITE_RETRY_DELAY,
 )
 from .exceptions import CommandError, ConnectionError, DiscoveryError
 from .models import LampState, RGBColor, WhiteColor
@@ -45,14 +44,14 @@ def _parse_mode(value: int) -> tuple[bool, str]:
     return True, "rgb" if value & MODE_BIT_RGB else "white"
 
 
-def _parse_rgb(data: bytes) -> Optional[RGBColor]:
+def _parse_rgb(data: bytes) -> RGBColor | None:
     """Parse RGB characteristic bytes (r, g, b; 0-100 each)."""
     if len(data) < 3:
         return None
     return RGBColor(*(min(v, 100) for v in data[:3]))
 
 
-def _parse_white(data: bytes) -> Optional[WhiteColor]:
+def _parse_white(data: bytes) -> WhiteColor | None:
     """Parse WHITE characteristic bytes (warm, cold; 0-100 each)."""
     if len(data) < 2:
         return None
@@ -69,11 +68,11 @@ class LampsterClient:
             address: Bluetooth MAC address of the device (e.g., "XX:XX:XX:XX:XX:XX")
         """
         self.address = address
-        self._client: Optional[BleakClient] = None
+        self._client: BleakClient | None = None
         self._state = LampState(is_on=False, mode="off")
 
     @staticmethod
-    async def discover(timeout: float = 5.0, stop_on_first: bool = True) -> list[BLEDevice]:
+    async def discover(timeout: float = 5.0, stop_on_first: bool = True) -> list[BLEDevice]:  # noqa: ASYNC109
         """Discover Lampster devices nearby.
 
         Uses early-exit strategy to stop scanning as soon as a device is found.
@@ -94,6 +93,7 @@ class LampsterClient:
             # Early exit: stop as soon as we find one matching device
             lampster_devices = []
             seen_addresses = set()
+            found = asyncio.Event()
 
             def detection_callback(device, advertisement_data):
                 # Check if device name contains "Lamp" and not already found
@@ -101,24 +101,22 @@ class LampsterClient:
                     if device.address not in seen_addresses:
                         seen_addresses.add(device.address)
                         lampster_devices.append(device)
-                        return True  # Stop scanning
-                return False
+                        found.set()
 
             scanner = BleakScanner(detection_callback=detection_callback)
             await scanner.start()
 
             # Wait up to timeout or until device found
-            start_time = asyncio.get_event_loop().time()
-            while not lampster_devices and (asyncio.get_event_loop().time() - start_time) < timeout:
-                await asyncio.sleep(0.1)
-
-            await scanner.stop()
+            try:
+                await asyncio.wait_for(found.wait(), timeout)
+            except TimeoutError:
+                pass
+            finally:
+                await scanner.stop()
         else:
             # Traditional scan: wait for full timeout
             devices = await BleakScanner.discover(timeout=timeout)
-            lampster_devices = [
-                d for d in devices if d.name and DEVICE_NAME_PREFIX in d.name
-            ]
+            lampster_devices = [d for d in devices if d.name and DEVICE_NAME_PREFIX in d.name]
 
         if not lampster_devices:
             raise DiscoveryError("No Lampster devices found")
@@ -126,7 +124,7 @@ class LampsterClient:
         _LOGGER.info(f"Found {len(lampster_devices)} Lampster device(s)")
         return lampster_devices
 
-    async def connect(self, timeout: float = 10.0) -> bool:
+    async def connect(self, timeout: float = 10.0) -> bool:  # noqa: ASYNC109
         """Connect to the Lampster device.
 
         Args:
@@ -183,9 +181,7 @@ class LampsterClient:
             except Exception:
                 pass
 
-            _LOGGER.debug(
-                f"Mode write 0x{mode:02x} rejected (attempt {attempt}): {last_error}"
-            )
+            _LOGGER.debug(f"Mode write 0x{mode:02x} rejected (attempt {attempt}): {last_error}")
             await asyncio.sleep(MODE_WRITE_RETRY_DELAY)
 
         raise CommandError(f"Failed to write mode: {last_error}") from last_error
@@ -496,7 +492,7 @@ class LampsterClient:
     async def start_notifications(
         self,
         on_state: Callable[[LampState], None],
-        on_temperature: Optional[Callable[[float], None]] = None,
+        on_temperature: Callable[[float], None] | None = None,
     ):
         """Subscribe to state changes pushed by the device.
 

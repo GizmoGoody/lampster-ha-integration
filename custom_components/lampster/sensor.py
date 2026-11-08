@@ -1,4 +1,5 @@
 """Diagnostic sensors for The Lampster integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -140,9 +141,7 @@ async def async_setup_entry(
     """Set up The Lampster sensors from a config entry."""
     coordinator: LampsterCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities(
-        LampsterSensor(coordinator, description) for description in SENSORS
-    )
+    async_add_entities(LampsterSensor(coordinator, description) for description in SENSORS)
 
 
 class LampsterSensor(LampsterEntity, SensorEntity):

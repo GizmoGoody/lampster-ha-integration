@@ -27,9 +27,6 @@ jobs:
   ruff:
     name: Ruff (lint and format)
     runs-on: ubuntu-latest
-    # Report only until the open branches are merged upstream and the code
-    # is cleaned up in one pass; then remove this line to make it required
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Lint

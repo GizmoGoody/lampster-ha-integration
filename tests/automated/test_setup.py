@@ -1,4 +1,5 @@
 """Tests for setting up and stopping The Lampster integration."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,7 +17,9 @@ async def test_disconnects_when_home_assistant_stops(hass: HomeAssistant) -> Non
     """Home Assistant does not unload entries when it stops: the integration disconnects itself."""
     entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS})
     entry.add_to_hass(hass)
-    coordinator = MagicMock(async_start=MagicMock(return_value=lambda: None), async_stop=AsyncMock())
+    coordinator = MagicMock(
+        async_start=MagicMock(return_value=lambda: None), async_stop=AsyncMock()
+    )
     with (
         patch("custom_components.lampster.LampsterCoordinator", return_value=coordinator),
         patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()),
@@ -33,7 +36,9 @@ async def test_no_disconnect_on_stop_after_unload(hass: HomeAssistant) -> None:
     """Once the entry is unloaded, stopping Home Assistant does not disconnect it again."""
     entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS})
     entry.add_to_hass(hass)
-    coordinator = MagicMock(async_start=MagicMock(return_value=lambda: None), async_stop=AsyncMock())
+    coordinator = MagicMock(
+        async_start=MagicMock(return_value=lambda: None), async_stop=AsyncMock()
+    )
     with (
         patch("custom_components.lampster.LampsterCoordinator", return_value=coordinator),
         patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()),

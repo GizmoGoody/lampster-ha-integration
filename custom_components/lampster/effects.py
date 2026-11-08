@@ -4,13 +4,14 @@ The Lampster has no built-in effects or fades, so Home Assistant sends each
 step over the Bluetooth connection. Each effect or transition is a sequence
 of Steps: a color for one mode (RGB or white) and how long to hold it.
 """
+
 from __future__ import annotations
 
-from collections.abc import Iterator
 import colorsys
-from dataclasses import dataclass
 import math
 import random
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 from homeassistant.components.light import EFFECT_COLORLOOP, EFFECT_RANDOM
 

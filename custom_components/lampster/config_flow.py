@@ -1,12 +1,11 @@
 """Config flow for The Lampster integration."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from bleak import BleakError
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
@@ -58,9 +57,7 @@ class LampsterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
 
-    async def async_step_bluetooth(
-        self, discovery_info: BluetoothServiceInfoBleak
-    ) -> FlowResult:
+    async def async_step_bluetooth(self, discovery_info: BluetoothServiceInfoBleak) -> FlowResult:
         """Handle the bluetooth discovery step."""
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
@@ -84,14 +81,10 @@ class LampsterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._set_confirm_only()
         return self.async_show_form(
             step_id="bluetooth_confirm",
-            description_placeholders={
-                "name": "The Lampster"
-            },
+            description_placeholders={"name": "The Lampster"},
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the user step to pick discovered device."""
         if user_input is not None:
             address = user_input[CONF_ADDRESS]
@@ -154,9 +147,7 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
     shown on a second step only in that case.
     """
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Choose the connection mode."""
         options = self.config_entry.options
         if user_input is not None:
@@ -196,9 +187,7 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
             ),
         )
 
-    async def async_step_timing(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_timing(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Set the Periodic connection timing."""
         if user_input is not None:
             return self.async_create_entry(
@@ -212,15 +201,11 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         CONF_RECONNECT_INTERVAL,
-                        default=options.get(
-                            CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL
-                        ),
+                        default=options.get(CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL),
                     ): _seconds_selector(10, 300, 5),
                     vol.Optional(
                         CONF_DISCONNECT_AFTER,
-                        default=options.get(
-                            CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER
-                        ),
+                        default=options.get(CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER),
                     ): _seconds_selector(0, 600, 5),
                 }
             ),

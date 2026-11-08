@@ -1,15 +1,15 @@
 """Tests for the config and options flows, and diagnostics."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.lampster.const import (
     CONF_CONNECTION_MODE,
@@ -46,7 +46,9 @@ async def test_bluetooth_discovery(hass: HomeAssistant) -> None:
 
 async def test_bluetooth_discovery_already_configured(hass: HomeAssistant) -> None:
     """A lamp that is already set up is not offered again."""
-    MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS}).add_to_hass(hass)
+    MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, data={CONF_ADDRESS: ADDRESS}).add_to_hass(
+        hass
+    )
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_BLUETOOTH}, data=DISCOVERY
     )

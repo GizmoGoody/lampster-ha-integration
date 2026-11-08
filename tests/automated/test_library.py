@@ -1,4 +1,5 @@
 """Tests for the bundled lampster BLE library."""
+
 from __future__ import annotations
 
 import pytest
@@ -110,7 +111,9 @@ async def test_mode_switch_writes_color_right_away(
     original_write = fake.write_gatt_char
 
     async def record_write(char: str, data: bytes, response: bool = False) -> None:
-        events.append("mode" if char.startswith(MODE) else "white" if char.startswith(WHITE) else "rgb")
+        events.append(
+            "mode" if char.startswith(MODE) else "white" if char.startswith(WHITE) else "rgb"
+        )
         await original_write(char, data, response)
 
     async def record_sleep(_delay: float) -> None:
