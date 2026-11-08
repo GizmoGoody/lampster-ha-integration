@@ -69,25 +69,22 @@
   "options": {
     "step": {
       "init": {
-        "title": "Bluetooth connection settings",
-        "description": "The Lampster accepts only one Bluetooth connection at a time, so The Lampster app cannot be used while Home Assistant is connected and vice-versa.",
+        "title": "Bluetooth Connection Options",
+        "description": "Choose how Home Assistant manages the Bluetooth connection to The Lampster. The Lampster accepts only one Bluetooth connection at a time, so The Lampster app cannot be used while Home Assistant is connected.",
         "data": {
-          "always_connected": "Maintain Bluetooth connection at all times"
-        },
-        "data_description": {
-          "always_connected": "Keep the Bluetooth connection active even while The Lampster is off, so commands are more responsive. This permanently ties up one of the connection slots on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default). If this is unchecked, you can select Submit to configure the check interval and connection hang-on time."
+          "connection_mode": "Connection"
         }
       },
       "timing": {
-        "title": "Bluetooth connection timing",
-        "description": "While The Lampster is on, Home Assistant stays connected. These settings control what happens after it is turned off.",
+        "title": "Bluetooth Connection Options",
+        "description": "These settings control the Periodic connection: how often Home Assistant checks The Lampster while it is off, and how long it stays connected after it is turned off.",
         "data": {
-          "poll_interval": "Check interval",
-          "off_disconnect_delay": "Connection hang-on time"
+          "reconnect_interval": "Refresh interval",
+          "disconnect_after": "Connection hang-on time"
         },
         "data_description": {
-          "poll_interval": "While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button. Shorter intervals notice it sooner but connect more often.",
-          "off_disconnect_delay": "How long the connection remains active after The Lampster is turned off."
+          "reconnect_interval": "While The Lampster is off and disconnected, how often Home Assistant briefly connects to check whether it was turned on with the touch button. Shorter intervals notice it sooner but connect more often.",
+          "disconnect_after": "How long the connection remains active after The Lampster is turned off."
         }
       }
     }
@@ -104,6 +101,14 @@
     "not_heard": {
       "title": "The Lampster cannot be found",
       "description": "Home Assistant has not heard The Lampster for several minutes and is not connected to it. The Lampster stops sending Bluetooth signals while something else is connected to it, and it can also stop responding until it is power-cycled.\n\nTry these in order:\n1. Close The Lampster app.\n2. Unplug The Lampster for about 10 seconds, then plug it back in.\n3. Check the nearest Bluetooth adapter or proxy.\n4. Connect once with The Lampster app, then repeat starting at step 1.\n\nThis notice clears itself as soon as Home Assistant hears The Lampster again."
+    }
+  },
+  "selector": {
+    "connection_mode": {
+      "options": {
+        "periodic": "Periodic – Stays connected while The Lampster is on, and disconnects a while after it is turned off. Select Submit to set the timing.",
+        "constant": "Constant – Stays connected at all times, so commands respond faster and touch-button changes show up instantly. This permanently uses one connection slot on your Bluetooth adapter or proxy (ESPHome Bluetooth proxies have 3 by default)."
+      }
     }
   }
 }

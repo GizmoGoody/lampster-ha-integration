@@ -19,16 +19,22 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
 )
 
 from .const import (
-    CONF_ALWAYS_CONNECTED,
-    CONF_OFF_DISCONNECT_DELAY,
-    CONF_POLL_INTERVAL,
-    DEFAULT_ALWAYS_CONNECTED,
-    DEFAULT_OFF_DISCONNECT_DELAY,
-    DEFAULT_POLL_INTERVAL,
+    CONF_CONNECTION_MODE,
+    CONF_DISCONNECT_AFTER,
+    CONF_RECONNECT_INTERVAL,
+    CONNECTION_MODES,
+    CONNECTION_PERIODIC,
+    DEFAULT_DISCONNECT_AFTER,
+    DEFAULT_RECONNECT_INTERVAL,
     DOMAIN,
+    get_connection_mode,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,13 +134,13 @@ class LampsterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-def _seconds_selector(minimum: int, maximum: int) -> NumberSelector:
-    """Number box in seconds."""
+def _seconds_selector(minimum: int, maximum: int, step: int) -> NumberSelector:
+    """Return a number box for a duration in seconds."""
     return NumberSelector(
         NumberSelectorConfig(
             min=minimum,
             max=maximum,
-            step=5,
+            step=step,
             unit_of_measurement="s",
             mode=NumberSelectorMode.BOX,
         )
@@ -142,34 +148,29 @@ def _seconds_selector(minimum: int, maximum: int) -> NumberSelector:
 
 
 class LampsterOptionsFlow(config_entries.OptionsFlow):
-    """Handle connection options for The Lampster.
+    """Handle the Bluetooth connection options for The Lampster.
 
-    The timing options only apply when the connection is not kept open, so
-    they are shown on a second step only in that case.
+    The timing options only apply to the Periodic connection, so they are
+    shown on a second step only in that case.
     """
-
-    def __init__(self) -> None:
-        """Initialize the options flow."""
-        self._always_connected = DEFAULT_ALWAYS_CONNECTED
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Choose whether to keep the connection open while the lamp is off."""
+        """Choose the connection mode."""
         options = self.config_entry.options
         if user_input is not None:
-            self._always_connected = user_input[CONF_ALWAYS_CONNECTED]
-            if not self._always_connected:
+            if user_input[CONF_CONNECTION_MODE] == CONNECTION_PERIODIC:
                 return await self.async_step_timing()
-            # Keep the timing values for when the option is turned off again
+            # Keep the timing values for when Periodic is chosen again
             return self.async_create_entry(
                 data={
-                    CONF_ALWAYS_CONNECTED: True,
-                    CONF_POLL_INTERVAL: options.get(
-                        CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+                    CONF_CONNECTION_MODE: user_input[CONF_CONNECTION_MODE],
+                    CONF_RECONNECT_INTERVAL: options.get(
+                        CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL
                     ),
-                    CONF_OFF_DISCONNECT_DELAY: options.get(
-                        CONF_OFF_DISCONNECT_DELAY, DEFAULT_OFF_DISCONNECT_DELAY
+                    CONF_DISCONNECT_AFTER: options.get(
+                        CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER
                     ),
                 }
             )
@@ -179,11 +180,18 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_ALWAYS_CONNECTED,
-                        default=options.get(
-                            CONF_ALWAYS_CONNECTED, DEFAULT_ALWAYS_CONNECTED
-                        ),
-                    ): bool,
+                        CONF_CONNECTION_MODE,
+                        default=get_connection_mode(options),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(value=mode, label=mode.capitalize())
+                                for mode in CONNECTION_MODES
+                            ],
+                            translation_key=CONF_CONNECTION_MODE,
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    ),
                 }
             ),
         )
@@ -191,10 +199,10 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
     async def async_step_timing(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Set the check interval and how long to stay connected after off."""
-        if user_input is not None and CONF_POLL_INTERVAL in user_input:
+        """Set the Periodic connection timing."""
+        if user_input is not None:
             return self.async_create_entry(
-                data={CONF_ALWAYS_CONNECTED: False, **user_input}
+                data={CONF_CONNECTION_MODE: CONNECTION_PERIODIC, **user_input}
             )
 
         options = self.config_entry.options
@@ -202,16 +210,18 @@ class LampsterOptionsFlow(config_entries.OptionsFlow):
             step_id="timing",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_POLL_INTERVAL,
-                        default=options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
-                    ): _seconds_selector(10, 300),
-                    vol.Required(
-                        CONF_OFF_DISCONNECT_DELAY,
+                    vol.Optional(
+                        CONF_RECONNECT_INTERVAL,
                         default=options.get(
-                            CONF_OFF_DISCONNECT_DELAY, DEFAULT_OFF_DISCONNECT_DELAY
+                            CONF_RECONNECT_INTERVAL, DEFAULT_RECONNECT_INTERVAL
                         ),
-                    ): _seconds_selector(0, 600),
+                    ): _seconds_selector(10, 300, 5),
+                    vol.Optional(
+                        CONF_DISCONNECT_AFTER,
+                        default=options.get(
+                            CONF_DISCONNECT_AFTER, DEFAULT_DISCONNECT_AFTER
+                        ),
+                    ): _seconds_selector(0, 600, 5),
                 }
             ),
         )
