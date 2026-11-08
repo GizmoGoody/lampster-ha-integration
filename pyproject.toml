@@ -19,7 +19,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lampster"]
+packages = ["custom_components/lampster/lampster"]
 
 [tool.pytest.ini_options]
 # Automated tests only; the other scripts in tests/ drive real hardware

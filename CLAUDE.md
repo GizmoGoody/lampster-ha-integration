@@ -15,13 +15,6 @@ This project provides a Home Assistant custom integration for controlling The La
 
 ```
 lampster-ha-integration/
-├── lampster/                          # Core Python library
-│   ├── __init__.py                   # Package exports
-│   ├── client.py                     # LampsterClient - main BLE control class
-│   ├── constants.py                  # BLE UUIDs, characteristics, commands
-│   ├── models.py                     # RGBColor, WhiteColor, LampState models
-│   └── exceptions.py                 # Custom exception classes
-│
 ├── tests/                             # Phase 1: Local testing scripts
 │   ├── test_discovery.py             # Device discovery and UUID enumeration
 │   ├── test_power.py                 # Power on/off testing
@@ -36,7 +29,8 @@ lampster-ha-integration/
 │   ├── light.py                      # Light entity implementation
 │   ├── const.py                      # HA-specific constants
 │   ├── strings.json                  # UI strings for config flow
-│   └── translations/en.json          # English translations
+│   ├── translations/en.json          # English translations
+│   └── lampster/                     # Core BLE library (the only copy; uv installs it as `lampster` for the CLI and scripts)
 │
 ├── pyproject.toml                     # uv/pip project configuration
 ├── .gitignore                         # Git ignore patterns
@@ -84,7 +78,7 @@ Phase 2 builds on the validated core library to create a full HA integration.
 
 **Setup**:
 1. Copy `custom_components/lampster/` to HA config directory
-2. Ensure `lampster/` core library is importable
+2. The core library ships inside it (`custom_components/lampster/lampster/`)
 3. Restart Home Assistant
 4. Add integration via UI: Settings → Devices & Services → Add Integration
 
@@ -111,13 +105,13 @@ Phase 2 builds on the validated core library to create a full HA integration.
 - Private members: `_leading_underscore` (e.g., `_client`, `_write_mode`)
 
 ### BLE Protocol Constants
-All BLE-related constants live in `lampster/constants.py`:
+All BLE-related constants live in `custom_components/lampster/lampster/constants.py`:
 - Characteristic UUIDs: `CHAR_MODE`, `CHAR_RGB`, `CHAR_WHITE`
 - Mode commands: `MODE_POWER_ON`, `MODE_POWER_OFF`, etc.
 - Value ranges: `MIN_VALUE`, `MAX_VALUE`
 
 ### Error Handling
-- Use custom exceptions from `lampster/exceptions.py`
+- Use custom exceptions from `custom_components/lampster/lampster/exceptions.py`
 - `ConnectionError` - BLE connection issues
 - `CommandError` - Command execution failures
 - `DiscoveryError` - Device discovery failures
@@ -172,7 +166,7 @@ git tag -l -n9
 
 ### Creating a Release
 1. Update version in `pyproject.toml`
-2. Update version in `lampster/__init__.py`
+2. Update version in `custom_components/lampster/lampster/__init__.py`
 3. Update version in `custom_components/lampster/manifest.json` (Phase 2)
 4. Update CHANGELOG.md (when created)
 5. Commit: `git commit -m "chore: bump version to X.Y.Z"`
@@ -252,7 +246,7 @@ Based on [Noki's documentation](https://github.com/Noki/the-lampster):
 | Temperature | | 00002a6e-0000-1000-8000-00805f9b34fb | Internal temperature, notified about every 5 s |
 
 The UUIDs come from characteristic enumeration on a real lamp (LA-2017B,
-firmware 10); see `lampster/constants.py`. Noki's handles are one higher.
+firmware 10); see `custom_components/lampster/lampster/constants.py`. Noki's handles are one higher.
 
 ### Command Format
 
