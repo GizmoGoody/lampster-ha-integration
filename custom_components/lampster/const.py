@@ -43,3 +43,4 @@ def get_connection_mode(options: Mapping[str, Any]) -> str:
 
 # Actions
 SERVICE_START_EFFECT = "start_effect"
+SERVICE_STOP_EFFECT = "stop_effect"
