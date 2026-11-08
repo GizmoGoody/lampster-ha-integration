@@ -316,7 +316,7 @@ Connection dropped unexpectedly; reconnecting in 5 s
 
 If Home Assistant fails to connect to The Lampster 5 times in a row, a repair notice appears under **Settings** → **Repairs**. A separate notice explains when every Bluetooth connection slot that can reach The Lampster is in use. Both clear themselves once a connection succeeds.
 
-When The Lampster app is connected, The Lampster stops advertising, so Home Assistant sees it as unavailable (the same as when it is unplugged) rather than raising a notice.
+If no Bluetooth adapter or proxy has heard The Lampster for about 5 minutes while Home Assistant is not connected to it, a **The Lampster cannot be found** notice appears instead, with the fixes to try: close The Lampster app; unplug The Lampster for about 10 seconds, then plug it back in; check the nearest Bluetooth adapter or proxy; and if it still cannot be found, connect once with The Lampster app, then repeat from the first step. The Lampster stops advertising while The Lampster app is connected, and its firmware can occasionally stop responding until it is power-cycled. The notice clears itself as soon as The Lampster is heard again.
 
 ### Enable Debug Logging
 
