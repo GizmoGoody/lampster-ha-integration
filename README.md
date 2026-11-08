@@ -207,6 +207,12 @@ Protocol based on reverse engineering by [Noki](https://github.com/Noki/the-lamp
 - Brightness changes made from Home Assistant keep the warm/cold ratio, so the color temperature stays the same while dimming
 - Each LED has 101 levels, so a color temperature worked out from the LEDs can be off by up to about 130 K at low brightness. Home Assistant therefore shows the color temperature and brightness exactly as requested, for as long as The Lampster still shows them; after a touch-button change, it shows the values worked out from the LEDs
 
+### Touch Button
+
+- A momentary tap turns The Lampster off or back on. It keeps the mode and levels, so the next tap brings back the same color or white
+- A press slightly longer than a tap counts as the start of a hold. In color mode, a hold starts by switching to white, so a press that is not quite momentary switches a color to white instead of turning it off
+- Holding dims or brightens white, as described under Color Temperature Mode
+
 ### Connection Handling
 
 - **While The Lampster is on**, Home Assistant stays connected. The Lampster pushes every change over the connection, including touch button taps and holds, so they show up instantly
