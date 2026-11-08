@@ -1,0 +1,52 @@
+{
+  "entity": {
+    "light": {
+      "lampster": {
+        "default": "mdi:desk-lamp",
+        "state": {
+          "on": "mdi:desk-lamp-on",
+          "off": "mdi:desk-lamp-off"
+        },
+        "state_attributes": {
+          "effect": {
+            "default": "mdi:creation",
+            "state": {
+              "off": "mdi:circle-off-outline",
+              "colorloop": "mdi:looks",
+              "random": "mdi:dice-multiple",
+              "candle": "mdi:candle",
+              "fireplace": "mdi:fireplace",
+              "breathe": "mdi:sine-wave"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "bluetooth_source": {
+        "default": "mdi:bluetooth"
+      },
+      "command_time": {
+        "default": "mdi:timer-outline"
+      },
+      "connect_time": {
+        "default": "mdi:bluetooth-connect"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "connection": {
+        "default": "mdi:bluetooth",
+        "state": {
+          "connected": "mdi:bluetooth-connect",
+          "standby": "mdi:timer-sand",
+          "connecting": "mdi:bluetooth-settings",
+          "checking": "mdi:bluetooth-transfer",
+          "reconnecting": "mdi:sync",
+          "failed": "mdi:alert-circle-outline",
+          "disconnected": "mdi:bluetooth-off"
+        }
+      }
+    }
+  }
+}

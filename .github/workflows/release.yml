@@ -1,0 +1,30 @@
+name: Release
+
+# Publish a GitHub release for the integration's version if one does not
+# exist yet, so HACS shows version numbers and release notes instead of
+# commit IDs
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a release for a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(jq -r .version custom_components/lampster/manifest.json)
+          tag="v${version}"
+          # Only published releases count (drafts are ignored)
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > /dev/null 2>&1; then
+            echo "Release $tag already exists"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --generate-notes
+          fi
