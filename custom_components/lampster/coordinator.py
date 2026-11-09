@@ -177,6 +177,8 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         # The color the task last wrote; the lamp does not report our color
         # writes, so a different white reported in the task's mode is a hold
         self._task_color: Color | None = None
+        # The state shown before the running task changed it
+        self._task_before: LampState | None = None
         # White brightness steps reported by the lamp (touch-button holds),
         # and the white levels it last reported or were last read
         self._white_steps = 0
@@ -806,6 +808,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.effect_speed_override = speed
         self.effect_color = color
         self.effect_brightness = brightness
+        before = self.data
         # The effect's writes are not reported, so The Lampster would still
         # show as off when an effect is started from off; it is on in the
         # effect's mode until the effect stops
@@ -813,7 +816,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self.data = dataclasses.replace(
             start or self.data or LampState(is_on=True, mode=mode), is_on=True, mode=mode
         )
-        self._async_start_task(mode, steps, f"effect {effect}")
+        self._async_start_task(mode, steps, f"effect {effect}", before=before)
         self._record(f"Started effect {effect} at {speed or self.effect_speed}% speed")
         self.async_update_listeners()
 
@@ -838,13 +841,14 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         await self._async_stop_task()
         start = current_color(self.data, mode)
         steps = transition_steps(start, target, duration)
+        before = self.data
         self.data = dataclasses.replace(
             self.data or LampState(is_on=True, mode=mode),
             is_on=True,
             mode=mode,
             **({"rgb_color": target} if mode == MODE_RGB else {"white_color": target}),
         )
-        self._async_start_task(mode, steps, "transition")
+        self._async_start_task(mode, steps, "transition", before=before)
         self._record(f"Fading to {target} over {duration} s")
         self.async_update_listeners()
 
@@ -860,8 +864,9 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         async def finish(client: LampsterClient) -> None:
             await client.power_off()
 
+        before = self.data
         self.data = dataclasses.replace(self.data, is_on=False, mode="off")
-        self._async_start_task(mode, steps, "transition off", finish)
+        self._async_start_task(mode, steps, "transition off", finish, before=before)
         self._record(f"Fading off over {duration} s")
         self.async_update_listeners()
 
@@ -872,8 +877,11 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         steps: Iterable[Step],
         name: str,
         finish: Callable[[LampsterClient], Awaitable[None]] | None = None,
+        before: LampState | None = None,
     ) -> None:
         self._task_mode = mode
+        # Shown again if the task fails before reaching The Lampster
+        self._task_before = before
         self._task_engaged = False
         self._task_color = None
         self._task_off = False
@@ -963,6 +971,11 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             self._task = None
             self._task_mode = None
             self.effect = None
+            # Drop the state shown at the start: show what was actually written
+            if self._client is not None:
+                self.data = dataclasses.replace(self._client.state)
+            elif self._task_before is not None:
+                self.data = self._task_before
             self.async_update_listeners()
 
     @callback

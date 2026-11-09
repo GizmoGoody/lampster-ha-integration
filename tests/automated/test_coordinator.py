@@ -703,3 +703,51 @@ async def test_repair_issue_raised_and_cleared(
     diagnostics = coordinator.diagnostics()
     assert diagnostics["consecutive_failures"] == 0
     assert diagnostics["recent_events"]
+
+
+async def _fail_writes(*args, **kwargs) -> None:
+    from bleak.exc import BleakError
+
+    raise BleakError("Not connected")
+
+
+async def test_failed_effect_start_shows_lamp_off(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """An effect that cannot reach The Lampster does not leave it shown as on."""
+    coordinator = make_coordinator()
+    coordinator._async_set_state(LampState(is_on=False, mode="off"), batch=False)
+
+    async def fail(*args, **kwargs):
+        raise TimeoutError("timed out")
+
+    with patch.object(coordinator_module, "establish_connection", fail):
+        await coordinator.async_start_effect("candle", 200)
+        await hass.async_block_till_done()
+    assert coordinator.effect is None
+    assert not coordinator.data.is_on
+
+
+async def test_failed_fade_on_shows_lamp_off(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A fade on that fails shows The Lampster as it is, not at the target."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator._async_try_connect("check interval")  # lamp is off
+    lamp.client.write_gatt_char = _fail_writes
+    await coordinator.async_transition("white", WhiteColor(80, 20), 1)
+    await hass.async_block_till_done()
+    assert not coordinator.data.is_on
+
+
+async def test_failed_fade_off_shows_lamp_on(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A fade off that fails shows The Lampster still on."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator.async_command("set_white_color", WhiteColor(40, 10))
+    lamp.client.write_gatt_char = _fail_writes
+    await coordinator.async_transition_off(1)
+    await hass.async_block_till_done()
+    assert coordinator.data.is_on
+    assert coordinator.data.white_color == WhiteColor(40, 10)
