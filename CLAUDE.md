@@ -11,6 +11,10 @@ This project provides a Home Assistant custom integration for controlling The La
 
 **IMPORTANT**: All protocol information is based on [Noki's reverse engineering work](https://github.com/Noki/the-lampster). This attribution must be maintained in all documentation, code comments, and public communications about this project.
 
+[GizmoGoody](https://github.com/GizmoGoody) built much of the Home Assistant
+integration from v1.1.0 on. Keep the Credits section in README.md, and name
+contributors in the release notes for the releases they're part of.
+
 ## Project Structure
 
 ```
@@ -150,12 +154,15 @@ This project uses semantic versioning (MAJOR.MINOR.PATCH):
 - **MINOR**: New features, non-breaking changes
 - **PATCH**: Bug fixes, documentation updates
 
-### Current Version: 1.1.0
+### Current Version: 1.2.0
 - Phase 1 and Phase 2 complete
 - Fixes setup on current Home Assistant (issue #1)
 - Stays connected while on; touch button changes arrive as notifications
 - Options flow for connection behavior; effects; transitions; diagnostics
   and repairs; automated tests (tests/automated) and GitHub Actions
+- 1.2.0: Spin, Fireworks and Pursuit effects; Start/Stop effect actions;
+  Periodic or Constant connection; fade-off keeps the levels; tested on a
+  real lamp
 - See README.md for the full feature list and protocol notes
 
 ### Version History
@@ -410,6 +417,6 @@ MIT License (see LICENSE file)
 
 ---
 
-**Last Updated**: 2026-09-27
+**Last Updated**: 2026-11-08
 **Project Phase**: Phase 2 complete - Home Assistant integration
-**Current Version**: 1.1.0
+**Current Version**: 1.2.0

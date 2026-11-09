@@ -410,9 +410,12 @@ Manual checks in Home Assistant:
 4. Test automations and scripts
 5. Test device reconnection (power cycle device)
 
-## Attribution
+## Credits
 
-All BLE protocol information based on reverse engineering by **[Noki](https://github.com/Noki/the-lampster)**.
+- **[Noki](https://github.com/Noki/the-lampster)** reverse engineered the Bluetooth protocol. All protocol information here is based on that work.
+- **[GizmoGoody](https://github.com/GizmoGoody)** built much of the Home Assistant integration as it is today: the setup fix for current Home Assistant, touch-button sync, the connection options, effects and transitions, diagnostics and repair notices, and the automated tests and CI.
+
+Thanks also to everyone who has reported issues or sent fixes; see the [contributors](https://github.com/yamanote1138/lampster-ha-integration/graphs/contributors) page.
 
 ## License
 
