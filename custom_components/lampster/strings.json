@@ -19,7 +19,7 @@
     },
     "abort": {
       "already_configured": "The Lampster is already configured",
-      "no_devices_found": "The Lampster was not found"
+      "no_devices_found": "No Lampster lamp is in Bluetooth range. Make sure it's plugged in and close to a Bluetooth adapter or proxy, and close The Lampster app on your phone (the lamp can't be found while the app is connected to it)."
     }
   },
   "entity": {
