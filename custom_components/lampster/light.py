@@ -326,8 +326,9 @@ class LampsterLight(LampsterEntity, LightEntity):
             elif ATTR_COLOR_TEMP_KELVIN in kwargs:
                 mode = MODE_WHITE
                 color = self._white_request(kwargs[ATTR_COLOR_TEMP_KELVIN], brightness)
-            elif ATTR_BRIGHTNESS in kwargs or (transition and not self._attr_is_on):
-                # Current color at the new brightness (or fading on from off)
+            elif ATTR_BRIGHTNESS in kwargs or (not self._attr_is_on and self._has_last_color()):
+                # Current color at the new brightness, or the last color when
+                # turning on from off (as the touch button does)
                 if self._attr_color_mode == ColorMode.RGB:
                     mode = MODE_RGB
                     color = _rgb_to_device(self._attr_rgb_color, brightness)
@@ -335,6 +336,7 @@ class LampsterLight(LampsterEntity, LightEntity):
                     mode = MODE_WHITE
                     color = self._white_request(self._attr_color_temp_kelvin, brightness)
             elif not self._attr_is_on:
+                # No color known yet: The Lampster's own default
                 await self.coordinator.async_command("power_on")
                 return
             else:
@@ -349,6 +351,10 @@ class LampsterLight(LampsterEntity, LightEntity):
 
         except COMMAND_ERRORS as err:
             raise HomeAssistantError(f"Failed to turn on The Lampster: {err}") from err
+
+    def _has_last_color(self) -> bool:
+        """Return True if a color is known to turn back on with (not just the defaults)."""
+        return bool(self._attr_brightness)
 
     def _white_request(self, kelvin: int, brightness: int) -> WhiteColor:
         """Convert a white request to device values and remember it."""

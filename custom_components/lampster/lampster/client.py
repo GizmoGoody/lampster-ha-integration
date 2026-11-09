@@ -212,21 +212,9 @@ class LampsterClient:
         if not self._client or not self._client.is_connected:
             raise ConnectionError("Not connected to device")
 
-        try:
-            # Power on with warm white at 50% brightness
-            from .models import WhiteColor
-
-            await self._write_mode(MODE_POWER_ON)
-            await asyncio.sleep(0.4)  # Device needs time to process mode change
-            await self._write_mode(MODE_WHITE)
-            await self._client.write_gatt_char(CHAR_WHITE, bytes([50, 0]), response=False)
-
-            self._state.is_on = True
-            self._state.mode = "white"
-            self._state.white_color = WhiteColor(50, 0)
-            _LOGGER.info("Lamp powered on (warm white 50%)")
-        except Exception as e:
-            raise CommandError(f"Failed to power on: {e}") from e
+        # Levels before the mode, so the lamp doesn't show its stored white first
+        await self.set_white_color(WhiteColor(50, 0))
+        _LOGGER.info("Lamp powered on (warm white 50%)")
 
     async def power_off(self):
         """Turn the lamp off the way its touch button does.
@@ -299,6 +287,29 @@ class LampsterClient:
         await self._write_mode(MODE_RGB_OFF if self._state.mode == "rgb" else MODE_WHITE_OFF)
         self._state.is_on = False
         self._state.mode = "off"
+
+    async def store_color(self, color: RGBColor | WhiteColor):
+        """Write a color's levels without changing the mode.
+
+        While off, The Lampster stays dark and the next tap comes on with them.
+
+        Raises:
+            ConnectionError: If not connected
+            CommandError: If command fails
+        """
+        if not self._client or not self._client.is_connected:
+            raise ConnectionError("Not connected to device")
+        rgb = isinstance(color, RGBColor)
+        try:
+            await self._client.write_gatt_char(
+                CHAR_RGB if rgb else CHAR_WHITE, color.to_bytes(), response=False
+            )
+        except Exception as e:
+            raise CommandError(f"Failed to store color: {e}") from e
+        if rgb:
+            self._state.rgb_color = color
+        else:
+            self._state.white_color = color
 
     async def set_rgb_mode(self):
         """Switch to RGB mode.

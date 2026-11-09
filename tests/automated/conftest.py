@@ -47,7 +47,7 @@ class FakeLamp:
     def touch_tap(self) -> None:
         """Simulate a touch-button tap.
 
-        Color on -> white on (the real lamp sometimes turns off instead);
+        Color on -> white on (a slightly longer press; a quick tap turns it off);
         white on -> off; off -> on in the mode it was turned off in
         (0x28 -> 0xA8, 0x48 -> 0xC8, 0x40 -> 0xC0, as logged on hardware).
         """
@@ -92,7 +92,8 @@ class FakeBleakClient:
             if self.lamp.report_mode_writes:
                 self.lamp.push(key, bytes(data))
         elif key == WHITE:
-            self.lamp.white = bytes(data)
+            # Like the real lamp, all-zero white is stored as 1/0
+            self.lamp.white = bytes(data) if any(data) else bytes([1, 0])
             self.lamp.white_writes.append(tuple(data))
         elif key == RGB:
             self.lamp.rgb = bytes(data)

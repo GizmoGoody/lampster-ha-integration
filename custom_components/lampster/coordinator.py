@@ -348,7 +348,7 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
         The base class sets this from advertisements, and clears it when Home
         Assistant marks the lamp unavailable.
         """
-        return self._available
+        return super().available
 
     @callback
     def _async_check_not_heard(self) -> None:
@@ -859,10 +859,13 @@ class LampsterCoordinator(PassiveBluetoothDataUpdateCoordinator):
             await self.async_command("power_off")
             return
         mode = self.data.mode
-        steps = transition_steps(current_color(self.data, mode), zero_color(mode), duration)
+        start = current_color(self.data, mode)
+        steps = transition_steps(start, zero_color(mode), duration)
 
         async def finish(client: LampsterClient) -> None:
             await client.power_off()
+            # The fade leaves the lamp at 1%, so put back the levels for the next tap
+            await client.store_color(start)
 
         before = self.data
         self.data = dataclasses.replace(self.data, is_on=False, mode="off")

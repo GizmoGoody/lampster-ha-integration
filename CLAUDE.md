@@ -253,15 +253,24 @@ firmware 10); see `custom_components/lampster/lampster/constants.py`. Noki's han
 **Mode Control** (1 byte, a bit field):
 - Bit `0x80` is power, bit `0x20` is RGB (otherwise white)
 - `0xC8` white on, `0xA8` RGB on, `0x48` white off, `0x28` RGB off
-- `0xC0` power on and `0x40` power off are also accepted; `0xC0` is rejected
-  while already on, and mode writes are rejected while a previous mode change
-  is still being processed
-- The touch button turns off by clearing only the power bit, so the next tap
-  brings back the same mode and levels
+- `0x48` / `0x28` (clearing only the power bit) is how both the touch button
+  and the integration turn it off, so the next tap brings back the same mode
+  and levels
+- `0xC0` power on is rejected while already on. A bare `0x40` turns it off
+  from white, but from RGB the lamp flashes white and stays lit in its color
+  while reading back `0x40`; it's only used in the fallback power-off, after
+  switching to white and zeroing the levels
+- The lamp stores an all-zero white as `[1, 0]`, so a fade to zero leaves 1%
+  for the next tap; levels written while off keep it dark and are used on the
+  next tap
+- Mode writes are rejected while a previous mode change is still being
+  processed
 - A momentary tap toggles power; a slightly longer press counts as the start
   of a hold, which in RGB mode first switches to white
 - A hold steps both white LEDs by the same amount, about 10 steps per second,
   and stops when the weaker LED reaches 1 or the stronger reaches 100
+- When plugged in, it turns itself on in white (at its own level, not the
+  last one)
 
 **RGB Control** (3 bytes):
 - Format: `[RR, GG, BB]`

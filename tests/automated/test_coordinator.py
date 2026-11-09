@@ -228,6 +228,26 @@ async def test_transition_off_fades_then_powers_off(
     assert coordinator.data.is_on is False
 
 
+async def test_transition_off_keeps_levels_for_next_tap(
+    hass: HomeAssistant,
+    lamp: FakeLamp,
+    make_coordinator: CoordinatorFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After fading off, a tap comes back at the level from before the fade, not 1%."""
+    monkeypatch.setattr(effects, "TRANSITION_MIN_STEP", 0.001)
+    lamp.mode = 0xC8
+    lamp.white = bytes([60, 20])
+    coordinator = make_coordinator()
+    await coordinator._async_try_connect("check interval")
+    await coordinator.async_transition_off(0.05)
+    await coordinator._task
+    assert lamp.mode == 0x48
+    assert lamp.white == bytes([60, 20])
+    lamp.touch_tap()
+    assert lamp.mode == 0xC8
+
+
 async def test_breathe_from_off_uses_last_color(
     hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
 ) -> None:
@@ -751,3 +771,40 @@ async def test_failed_fade_off_shows_lamp_on(
     await hass.async_block_till_done()
     assert coordinator.data.is_on
     assert coordinator.data.white_color == WhiteColor(40, 10)
+
+
+async def test_turn_on_brings_back_last_color(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """A plain turn on from off brings back the last color, like the touch button."""
+    coordinator = make_coordinator(always_connected=True)
+    light = LampsterLight(coordinator)
+    await light.async_turn_on(rgb_color=(255, 0, 0), brightness=102)
+    light._update_from_coordinator()
+    await light.async_turn_off()
+    light._update_from_coordinator()
+    await light.async_turn_on()
+    assert lamp.mode == 0xA8
+    assert lamp.rgb == bytes([40, 0, 0])
+
+    await light.async_turn_on(color_temp_kelvin=2700, brightness=128)
+    light._update_from_coordinator()
+    white = lamp.white
+    await light.async_turn_off()
+    light._update_from_coordinator()
+    await light.async_turn_on()
+    assert lamp.mode == 0xC8
+    assert lamp.white == white
+
+
+async def test_turn_on_without_known_color_uses_default(
+    hass: HomeAssistant, lamp: FakeLamp, make_coordinator: CoordinatorFactory
+) -> None:
+    """With no color known yet, a plain turn on uses The Lampster's default."""
+    coordinator = make_coordinator(always_connected=True)
+    await coordinator._async_try_connect("check interval")  # lamp is off
+    light = LampsterLight(coordinator)
+    light._update_from_coordinator()
+    await light.async_turn_on()
+    assert lamp.mode == 0xC8
+    assert lamp.white == bytes([50, 0])

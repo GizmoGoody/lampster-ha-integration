@@ -162,7 +162,7 @@ async def test_power_off_falls_back_to_zeroed(
     fake.write_gatt_char = rejects_28
     await client.power_off()
     assert lamp.mode == 0x40
-    assert lamp.white == bytes([0, 0])
+    assert lamp.white_writes[-1] == (0, 0)  # stored as 1/0, like the real lamp
     assert not client.state.is_on
 
 
@@ -184,3 +184,35 @@ async def test_notifications_update_state(lamp: FakeLamp) -> None:
 async def test_read_versions(lamp: FakeLamp) -> None:
     """Firmware and hardware revisions are decoded as text."""
     assert await _client(lamp).read_versions() == {"firmware": "10", "hardware": "100B"}
+
+
+async def test_power_on_writes_levels_before_mode(lamp: FakeLamp) -> None:
+    """power_on writes warm white before turning on, so the stored white doesn't flash."""
+    lamp.mode = 0x28
+    lamp.white = bytes([10, 90])
+    client = _client(lamp)
+    await client.refresh_state()
+    fake = client._client
+    original = fake.write_gatt_char
+    writes: list[tuple[str, bytes]] = []
+
+    async def logged(char: str, data: bytes, response: bool = False) -> None:
+        writes.append((char[:8], bytes(data)))
+        await original(char, data, response)
+
+    fake.write_gatt_char = logged
+    await client.power_on()
+    first_mode = next(i for i, (char, _) in enumerate(writes) if char == MODE)
+    assert (WHITE, bytes([50, 0])) in writes[:first_mode]
+    assert lamp.mode == 0xC8
+    assert lamp.white == bytes([50, 0])
+
+
+async def test_power_on_while_on(lamp: FakeLamp) -> None:
+    """power_on while already on just sets warm white (0xC0 would be rejected)."""
+    lamp.mode = 0xA8
+    client = _client(lamp)
+    await client.refresh_state()
+    await client.power_on()
+    assert lamp.mode == 0xC8
+    assert lamp.white == bytes([50, 0])

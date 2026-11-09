@@ -7,10 +7,19 @@ start_effect:
     effect:
       required: true
       selector:
-        state:
-          attribute: effect
-          hide_states:
-            - "off"
+        select:
+          translation_key: effect
+          options:
+            - breathe
+            - colorloop
+            - random
+            - candle
+            - fireplace
+            - spin_cw
+            - spin_ccw
+            - spin_alternating
+            - fireworks
+            - pursuit
     speed:
       selector:
         number:
